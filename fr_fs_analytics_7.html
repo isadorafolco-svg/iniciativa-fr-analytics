@@ -1,0 +1,1636 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FR × FS — Liquidez, Concentração e Churn</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --paper:#F6F4EF;
+    --paper-2:#EFEBE2;
+    --ink:#1E1B16;
+    --ink-soft:#5B564C;
+    --line:#DAD3C4;
+    --fr:#1B3A93;
+    --fr-soft:#DEE4F6;
+    --fs:#C1572E;
+    --fs-soft:#F5E2D3;
+    --warn:#B4552F;
+    --warn-soft:#F3E2D6;
+    --card:#FFFEFB;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    letter-spacing:-0.01em;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+
+  /* ---------- HEADER / NAV ---------- */
+  header{
+    position:sticky;top:0;z-index:50;
+    background:var(--paper);
+    border-bottom:1px solid var(--line);
+  }
+  .header-top{
+    max-width:1180px;margin:0 auto;padding:22px 28px 14px;
+    display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;
+  }
+  .header-top h1{font-size:26px;margin:0 0 4px;}
+  .header-top p{margin:0;color:var(--ink-soft);font-size:13.5px;max-width:520px;}
+  .header-meta{text-align:right;font-size:12px;color:var(--ink-soft);}
+  .header-meta .mono{font-size:12px;color:var(--ink);}
+
+  nav{
+    max-width:1180px;margin:0 auto;padding:0 28px;
+    display:flex;gap:4px;overflow-x:auto;
+  }
+  nav button{
+    appearance:none;border:none;background:none;
+    font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:13px;
+    color:var(--ink-soft);
+    padding:12px 16px;cursor:pointer;white-space:nowrap;
+    border-bottom:2.5px solid transparent;
+    transition:color .15s ease, border-color .15s ease;
+  }
+  nav button .num{
+    font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:11px;
+    color:var(--ink-soft); margin-right:7px;
+  }
+  nav button:hover{color:var(--ink);}
+  nav button.active{color:var(--ink);border-bottom-color:var(--fr);}
+
+  .brand-tag{
+    font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;
+    color:var(--fr);text-transform:uppercase;font-weight:600;margin-bottom:4px;
+  }
+
+  main{max-width:1180px;margin:0 auto;padding:32px 28px 90px;}
+  section{display:none;}
+  section.active{display:block;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+
+  .section-head{margin-bottom:22px;}
+  .section-head .eyebrow{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;
+    color:var(--ink-soft);text-transform:uppercase;margin-bottom:6px;
+  }
+  .section-head h2{font-size:24px;margin:0 0 8px;}
+  .section-head .q{
+    font-size:14.5px;color:var(--ink-soft);max-width:760px;line-height:1.55;
+  }
+  .section-head .q b{color:var(--ink);font-weight:600;}
+
+  /* ---------- CARDS ---------- */
+  .grid{display:grid;gap:16px;}
+  .grid-2{grid-template-columns:1fr 1fr;}
+  .grid-3{grid-template-columns:1fr 1fr 1fr;}
+  .grid-4{grid-template-columns:repeat(4,1fr);}
+  @media (max-width:820px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr;}}
+
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:20px 22px;
+  }
+  .card.tight{padding:16px 18px;}
+  .stat-label{font-size:12px;color:var(--ink-soft);margin-bottom:6px;font-weight:500;}
+  .stat-value{font-family:'Fraunces',serif;font-size:30px;font-weight:600;line-height:1.05;}
+  .stat-value.fr{color:var(--fr);}
+  .stat-value.fs{color:var(--fs);}
+  .stat-sub{font-size:12px;color:var(--ink-soft);margin-top:6px;}
+
+  .chart-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 22px 8px;margin-bottom:20px;}
+  .chart-card h3{font-size:16px;margin:0 0 2px;}
+  .chart-card .sub{font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;}
+  .chart-wrap{position:relative;height:320px;}
+  .chart-wrap.tall{height:400px;}
+
+  .callout{
+    border-left:3px solid var(--fr);
+    background:var(--fr-soft);
+    padding:14px 18px;border-radius:0 8px 8px 0;
+    font-size:13.5px;line-height:1.6;margin:18px 0;
+  }
+  .callout.fs{border-left-color:var(--fs);background:var(--fs-soft);}
+  .callout.warn{border-left-color:var(--warn);background:var(--warn-soft);}
+  .callout b{font-weight:600;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{
+    text-align:left;font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;
+    color:var(--ink-soft);border-bottom:1px solid var(--line);padding:8px 10px;
+  }
+  tbody td{padding:8px 10px;border-bottom:1px solid var(--paper-2);}
+  tbody tr:hover{background:var(--paper-2);}
+  td.num,th.num{text-align:right;font-family:'IBM Plex Mono',monospace;}
+  .tag{
+    display:inline-block;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:20px;
+  }
+  .tag.fr{background:var(--fr-soft);color:var(--fr);}
+  .tag.fs{background:var(--fs-soft);color:var(--fs);}
+
+  .legend-row{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:4px;font-size:12px;color:var(--ink-soft);}
+  .legend-row span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+
+  .two-col{display:grid;grid-template-columns:1.05fr .95fr;gap:20px;}
+  @media (max-width:900px){.two-col{grid-template-columns:1fr;}}
+
+  .badge-answer{
+    display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;
+    padding:4px 10px;border-radius:5px;margin-bottom:10px;letter-spacing:.02em;
+  }
+  .badge-answer.yes{background:var(--fr-soft);color:var(--fr);}
+  .badge-answer.mixed{background:var(--warn-soft);color:var(--warn);}
+
+  footer{
+    max-width:1180px;margin:0 auto;padding:20px 28px 40px;
+    font-size:11.5px;color:var(--ink-soft);border-top:1px solid var(--line);
+  }
+  .caveat-list{margin:0;padding-left:18px;}
+  .caveat-list li{margin-bottom:6px;line-height:1.5;}
+
+  /* ---------- PRAÇA PICKER / TOGGLE (aba 07) ---------- */
+  .praça-picker{display:flex;gap:4px;flex-wrap:wrap;}
+  .praça-picker button{
+    appearance:none;border:1px solid var(--line);background:var(--paper);
+    font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:11.5px;
+    color:var(--ink-soft);padding:6px 11px;border-radius:20px;cursor:pointer;
+    transition:all .15s ease;
+  }
+  .praça-picker button:hover{border-color:var(--fr);color:var(--ink);}
+  .praça-picker button.active{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+
+  .fr-fs-toggle{display:flex;border:1px solid var(--line);border-radius:20px;overflow:hidden;}
+  .fr-fs-toggle button{
+    appearance:none;border:none;background:var(--card);
+    font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:11px;
+    color:var(--ink-soft);padding:5px 14px;cursor:pointer;
+  }
+  .fr-fs-toggle button.active{background:var(--ink);color:var(--paper);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div style="display:flex; align-items:flex-start; gap:18px;">
+      <img src="data:image/png;base64,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" alt="Grupo QuintoAndar" style="height:28px;width:auto;margin-top:4px;" />
+      <div>
+        <div class="brand-tag">B2B Classificados</div>
+        <h1>Liquidez, concentração e churn — FR × FS</h1>
+        <p>Base histórica ago/25 – ago/26. Diagnóstico de supply, concorrência e churn para orientar a estratégia de crescimento de For Rent.</p>
+      </div>
+    </div>
+    <div class="header-meta">
+      <div>Iniciativa For Rent — Grupo QuintoAndar</div>
+      <div class="mono">Base Bridge · Concentração · Impacto de churn</div>
+    </div>
+  </div>
+  <nav id="tabs">
+    <button class="active" data-target="resumo"><span class="num">00</span>Resumo</button>
+    <button data-target="bridge-fr"><span class="num">01</span>Bridge FR</button>
+    <button data-target="bridge-fs"><span class="num">02</span>Bridge FS</button>
+    <button data-target="liquidez"><span class="num">03</span>Liquidez FR vs FS</button>
+    <button data-target="concentracao"><span class="num">04</span>Concentração de estoque</button>
+    <button data-target="churn"><span class="num">05</span>Churn: leva FS junto?</button>
+    <button data-target="carga-vs-aquisicao"><span class="num">06</span>Carga vs. Aquisição</button>
+    <button data-target="rms-decomp"><span class="num">07</span>RMS: num. × den. por praça</button>
+    <button data-target="portais"><span class="num">08</span>Representatividade de portais</button>
+    <button data-target="iniciativa"><span class="num">09</span>Iniciativa FR — detalhe</button>
+    <button data-target="origem-vendas"><span class="num">10</span>Origem das vendas novas</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- ============ 00 RESUMO ============ -->
+  <section id="resumo" class="active">
+    <div class="section-head">
+      <div class="eyebrow">Resumo executivo</div>
+      <h2>Supply, concorrência e churn — o estado de For Rent hoje</h2>
+      <p class="q">O RMS de FR está estável enquanto o de FS cresce. Este documento consolida a decomposição dessa diferença — de onde ela vem, o que já está sendo feito para reverter, e onde ainda falta atenção — junto com o raio-x da iniciativa de hunting dedicada.</p>
+    </div>
+
+    <div class="grid grid-4" style="margin-bottom:20px;">
+      <div class="card">
+        <span class="badge-answer mixed">Liquidez bruta</span>
+        <div class="stat-label">FR movimenta mais estoque que FS?</div>
+        <div class="stat-value fr">16,3% <span style="font-size:15px;color:var(--ink-soft);font-family:'IBM Plex Sans';">vs</span> <span class="fs" style="color:var(--fs)">14,2%</span></div>
+        <div class="stat-sub">Movimentação bruta mensal média / estoque inicial. FR é levemente mais líquido — mas essa liquidez não converte em crescimento (ver próximo card).</div>
+      </div>
+      <div class="card">
+        <span class="badge-answer yes">Carga (clientes atuais)</span>
+        <div class="stat-label">Uplisting menos perda de carga</div>
+        <div class="stat-value fr">0,00% <span style="font-size:15px;color:var(--ink-soft);font-family:'IBM Plex Sans';">vs</span> <span class="fs" style="color:var(--fs)">+0,33%</span></div>
+        <div class="stat-sub">Net de carga mensal (% do estoque). Em FR, uplisting e perda de carga se cancelam quase exatamente — a base existente não contribui em nada no líquido.</div>
+      </div>
+      <div class="card">
+        <span class="badge-answer yes">Aquisição (cliente novo)</span>
+        <div class="stat-label">Venda nova menos churn</div>
+        <div class="stat-value fr">+0,51% <span style="font-size:15px;color:var(--ink-soft);font-family:'IBM Plex Sans';">vs</span> <span class="fs" style="color:var(--fs)">+0,75%</span></div>
+        <div class="stat-sub">Net de aquisição mensal (% do estoque). FR também perde aqui — venda nova é proporcionalmente mais fraca que em FS, com churn parecido nos dois.</div>
+      </div>
+      <div class="card">
+        <span class="badge-answer mixed">Concorrência</span>
+        <div class="stat-label">O mercado concorrente se move igual?</div>
+        <div class="stat-value fr">+2,7% <span style="font-size:15px;color:var(--ink-soft);font-family:'IBM Plex Sans';">vs</span> <span class="fs" style="color:var(--fs)">−0,7%</span></div>
+        <div class="stat-sub">Variação do concorrente, mar→jul/26. O mercado de aluguel concorrente está <b>crescendo</b>; o de venda está <b>encolhendo</b> — isso pressiona o RMS de FR e favorece o de FS, independente de nós.</div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <b>Leitura central:</b> a diferença entre FR e FS não vem de FR ser mais líquido ou mais concentrado — nessas duas dimensões os produtos são parecidos (abas 03 e 04). Decompondo o RMS em numerador (nosso supply) e denominador (concorrente), na janela mar→jul/26 a divergência se explica em <b>partes quase iguais</b>: <b>~47% vem do nosso próprio supply</b> crescer mais devagar em FR — porque a carga existente contribui zero (vs. +0,33%/mês em FS) e a aquisição de clientes novos é mais fraca (+0,51% vs. +0,75%/mês); e <b>~53% vem do concorrente</b> se mover em direções opostas — o mercado de aluguel concorrente está se expandindo enquanto o de venda está encolhendo, o que empurra o RMS de FR para baixo e o de FS para cima, por razões que não têm relação com nossa operação (ver aba 07).
+    </div>
+
+    <div class="callout" style="border-left-color:var(--fs);background:var(--fs-soft);">
+      <b>Churn, em Normandia:</b> quando uma conta zera FR, na maioria das vezes ela está saindo da base inteira — 88,4% do volume de FR perdido em churn vem de contas que zeraram FS por completo no mesmo mês (aba 05). Isso confirma que a alavanca certa é retenção geral de conta, não gestão isolada de portfólio FR.
+    </div>
+
+    <div class="callout warn">
+      <b>A iniciativa de hunting converte um volume relevante com apenas 2 pessoas:</b> em julho, a iniciativa contribuiu com 2.542 listings de venda nova de FR (bridge, aba 01) — cerca de 24% de toda a venda nova de FR do mês, considerando também os 8.032 listings trazidos pela operação orgânica (aba 10). A cobertura de contato também é praticamente total: das 100 maiores oportunidades do funil (42.145 listings), 97,4% já tiveram alguma interação — o gargalo atual está em converter quem já foi abordado, não em identificar quem abordar (aba 09).
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="stat-label" style="margin-bottom:10px;">Painel consolidado</div>
+        <table>
+          <thead><tr><th></th><th class="num">FR</th><th class="num">FS</th></tr></thead>
+          <tbody>
+            <tr><td>Net change acumulado (jan–ago/26)</td><td class="num mono">+5.184</td><td class="num mono">+230.794</td></tr>
+            <tr><td>Estoque final (ago/26)</td><td class="num mono">490.183</td><td class="num mono">3.774.765</td></tr>
+            <tr><td>Crescimento no período</td><td class="num mono">+1,1%</td><td class="num mono">+6,5%</td></tr>
+            <tr><td>Churn mensal — Normandia, contas</td><td class="num mono">8,1%</td><td class="num mono">7,5%</td></tr>
+            <tr><td>Churn mensal — Normandia, volume</td><td class="num mono">1,7%</td><td class="num mono">1,7%</td></tr>
+            <tr><td>Peso de grandes operadores — Normandia</td><td class="num mono">27,4%</td><td class="num mono">35,2%</td></tr>
+            <tr><td>New sale (Initiative) — bridge</td><td class="num mono" colspan="2" style="text-align:center;">Jun 4.027 · Jul 2.542</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="stat-label" style="margin-bottom:10px;">Onde investigar a seguir</div>
+        <ul style="font-size:13px;line-height:1.7;margin:0;padding-left:18px;color:var(--ink-soft);">
+          <li>Por que o concorrente de aluguel está crescendo (+2,7%) enquanto o de venda encolhe (−0,7%)? Isso é um portal específico ganhando força, ou o mercado de aluguel como um todo está se expandindo? (aba 07)</li>
+          <li>Uplisting bem direcionado tem, em tese, o dobro do potencial de impacto em FR — hoje esse motor está parado no zero, não devagar (aba 06).</li>
+          <li>Porto Alegre é a praça com maior divergência de RMS entre os produtos (0,50 FR vs 1,40 FS) — candidata a investigação prioritária por praça (aba 07).</li>
+          <li>25,4% do volume das 100 maiores oportunidades do funil já foram classificadas como perdidas, e 35,3% seguem em "tentativa de contato" sem resposta — vale revisar cadência e canal de follow-up (aba 09).</li>
+          <li>A queda de New sale (Initiative) entre junho (4.027) e julho (2.542) vale acompanhamento — entender se é sazonalidade ou saturação do pipeline atual (aba 01).</li>
+          <li>A rede Lopes sozinha representa mais estoque em Normandia que qualquer um dos 6 operadores originalmente mapeados — vale ampliar oficialmente a lista de grandes operadores monitorados (aba 08).</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 01 BRIDGE FR ============ -->
+  <section id="bridge-fr">
+    <div class="section-head">
+      <div class="eyebrow">01 · Up &amp; Down — For Rent</div>
+      <h2>Bridge mensal de FR, ago/25 → ago/26</h2>
+      <p class="q">Decomposição de <b>venda nova</b>, <b>uplisting</b>, <b>perda de carga</b> e <b>churn</b> mês a mês, na mesma estrutura pedida para o comparativo com FS.</p>
+    </div>
+
+    <div class="callout warn">
+      <b>Quebra de metodologia em jan/26:</b> a partir de 202601 os anúncios híbridos (venda+aluguel) passaram a contar também como FR — por isso o salto de estoque entre dez/25 (390,2k) e jan/26 (493,0k) é majoritariamente técnico, não um crescimento real de supply naquele mês. Interprete jan/26 com essa ressalva; a série de fev/26 em diante já está no critério atual.
+    </div>
+
+    <div class="chart-card">
+      <h3>Decomposição mensal — FR</h3>
+      <p class="sub">Barras empilhadas por categoria; linha representa o net change do mês.</p>
+      <div class="legend-row">
+        <span><span class="dot" style="background:#1B3A93"></span>Venda nova</span>
+        <span><span class="dot" style="background:#7C93D6"></span>Uplisting</span>
+        <span><span class="dot" style="background:#C98A6B"></span>Perda de carga</span>
+        <span><span class="dot" style="background:#B4552F"></span>Churn</span>
+        <span><span class="dot" style="background:#1E1B16"></span>Net change</span>
+      </div>
+      <div class="chart-wrap tall"><canvas id="chartBridgeFR"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="stat-label" style="margin-bottom:10px;">Tabela completa — FR</div>
+      <div style="overflow-x:auto;">
+        <table id="tableBridgeFR"><thead></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <div class="section-head" style="margin-top:32px;">
+      <div class="eyebrow">Dentro da venda nova</div>
+      <h3 style="font-family:'Fraunces',serif;font-size:19px;margin:0 0 8px;">Quanto vem da iniciativa de hunting?</h3>
+      <p class="q" style="margin-top:0;">A categoria "Venda nova" acima combina dois grupos: <b>Initiative</b> (contas trabalhadas pelos 2 hunters dedicados) e <b>Other</b> (venda nova orgânica, trazida pelo resto da operação comercial — ver aba 10).</p>
+    </div>
+
+    <div class="grid grid-2" style="margin-bottom:12px;">
+      <div class="card">
+        <div class="stat-label">New sale (Initiative) — junho/26</div>
+        <div class="stat-value fr">4.027<span style="font-size:14px;color:var(--ink-soft);font-family:'IBM Plex Sans';font-weight:400;"> listings</span></div>
+        <div class="stat-sub">Contribuição direta dos 2 hunters dedicados no mês.</div>
+      </div>
+      <div class="card">
+        <div class="stat-label">New sale (Initiative) — julho/26</div>
+        <div class="stat-value fr">2.542<span style="font-size:14px;color:var(--ink-soft);font-family:'IBM Plex Sans';font-weight:400;"> listings</span></div>
+        <div class="stat-sub">Queda de −37% frente a junho.</div>
+      </div>
+    </div>
+
+    <div class="callout">
+      A iniciativa contribuiu com <b>4.027 listings</b> em junho e <b>2.542 listings</b> em julho — uma queda relevante mês a mês que vale acompanhar de perto. Para contexto de escala: a venda nova orgânica (fora da iniciativa) somou 8.032 listings só em julho (aba 10), ou seja, a iniciativa dedicada representou cerca de 24% do total de venda nova de FR do mês, com 2 pessoas versus o resto da operação comercial.
+    </div>
+  </section>
+
+  <!-- ============ 02 BRIDGE FS ============ -->
+  <section id="bridge-fs">
+    <div class="section-head">
+      <div class="eyebrow">02 · Up &amp; Down — For Sale</div>
+      <h2>Bridge mensal de FS, ago/25 → ago/26</h2>
+      <p class="q">Mesma decomposição, agora para <b>For Sale</b> — a base de comparação para checar se FR de fato se movimenta mais.</p>
+    </div>
+
+    <div class="chart-card">
+      <h3>Decomposição mensal — FS</h3>
+      <p class="sub">Mesma escala de categorias que FR, eixo em milhares para caber a diferença de escala entre os produtos.</p>
+      <div class="legend-row">
+        <span><span class="dot" style="background:#C1572E"></span>Venda nova</span>
+        <span><span class="dot" style="background:#E0A480"></span>Uplisting</span>
+        <span><span class="dot" style="background:#C98A6B"></span>Perda de carga</span>
+        <span><span class="dot" style="background:#B4552F"></span>Churn</span>
+        <span><span class="dot" style="background:#1E1B16"></span>Net change</span>
+      </div>
+      <div class="chart-wrap tall"><canvas id="chartBridgeFS"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="stat-label" style="margin-bottom:10px;">Tabela completa — FS</div>
+      <div style="overflow-x:auto;">
+        <table id="tableBridgeFS"><thead></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 03 LIQUIDEZ ============ -->
+  <section id="liquidez">
+    <div class="section-head">
+      <div class="eyebrow">03 · Comparação direta</div>
+      <h2>Liquidez de estoque: FR é mais líquido que FS?</h2>
+      <p class="q">Liquidez aqui = <span class="mono">volume bruto movimentado no mês (venda nova + uplisting + perda + churn, em módulo) ÷ estoque inicial</span>. Quanto maior, mais o estoque "vira" mês a mês.</p>
+    </div>
+
+    <div class="chart-card">
+      <h3>Liquidez mensal — % do estoque inicial movimentado</h3>
+      <p class="sub">jan/26 aparece inflado em FR pela quebra de metodologia (híbridos) — ver nota na aba Bridge FR.</p>
+      <div class="legend-row">
+        <span><span class="dot" style="background:#1B3A93"></span>FR</span>
+        <span><span class="dot" style="background:#C1572E"></span>FS</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chartLiquidez"></canvas></div>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="stat-label">Liquidez média — FR</div>
+        <div class="stat-value fr">16,3%<span style="font-size:14px;color:var(--ink-soft);font-family:'IBM Plex Sans';font-weight:400;"> do estoque/mês</span></div>
+        <div class="stat-sub">Excluindo jan/26 (outlier metodológico): 15,4%</div>
+      </div>
+      <div class="card">
+        <div class="stat-label">Liquidez média — FS</div>
+        <div class="stat-value fs">14,2%<span style="font-size:14px;color:var(--ink-soft);font-family:'IBM Plex Sans';font-weight:400;"> do estoque/mês</span></div>
+        <div class="stat-sub">Série estável, sem quebra de metodologia.</div>
+      </div>
+    </div>
+
+    <div class="callout">
+      A diferença entre 16,3% e 14,2% é real mas modesta — FR não é "muito mais líquido", é <b>levemente mais líquido</b>. Isso é consistente com o fato de FR concentrar mais oferta de flats e temporada, categorias que naturalmente entram e saem do mercado com mais frequência que imóveis residenciais à venda. Não sustenta, por si só, uma narrativa de que o RMS de FR deveria ser fundamentalmente mais instável que o de FS.
+    </div>
+  </section>
+
+  <!-- ============ 04 CONCENTRAÇÃO ============ -->
+  <section id="concentracao">
+    <div class="section-head">
+      <div class="eyebrow">04 · Ranking de estoque</div>
+      <h2>Quanto do estoque está em quantos clientes?</h2>
+      <p class="q">Curva de concentração (tipo Pareto): eixo X é o número de clientes ordenados do maior para o menor estoque, eixo Y é o % acumulado do estoque total.</p>
+    </div>
+
+    <div class="chart-card">
+      <h3>Curva de concentração — FR vs FS</h3>
+      <p class="sub">Escala logarítmica no eixo X para caber os dois volumes (6.813 clientes com FR &gt; 0 vs 13.755 com FS &gt; 0) na mesma leitura.</p>
+      <div class="legend-row">
+        <span><span class="dot" style="background:#1B3A93"></span>FR (6.813 clientes)</span>
+        <span><span class="dot" style="background:#C1572E"></span>FS (13.755 clientes)</span>
+      </div>
+      <div class="chart-wrap tall"><canvas id="chartConcentracao"></canvas></div>
+    </div>
+
+    <div class="grid grid-4" style="margin-bottom:20px;">
+      <div class="card tight">
+        <div class="stat-label">Top 10 clientes</div>
+        <div class="stat-value fr" style="font-size:22px;">20,1%</div>
+        <div class="stat-sub">FR · <span class="fs" style="color:var(--fs)">18,9% FS</span></div>
+      </div>
+      <div class="card tight">
+        <div class="stat-label">Top 50 clientes</div>
+        <div class="stat-value fr" style="font-size:22px;">40,8%</div>
+        <div class="stat-sub">FR · <span class="fs" style="color:var(--fs)">39,9% FS</span></div>
+      </div>
+      <div class="card tight">
+        <div class="stat-label">Top 200 clientes</div>
+        <div class="stat-value fr" style="font-size:22px;">62,0%</div>
+        <div class="stat-sub">FR · <span class="fs" style="color:var(--fs)">62,7% FS</span></div>
+      </div>
+      <div class="card tight">
+        <div class="stat-label">Top 1.000 clientes</div>
+        <div class="stat-value fr" style="font-size:22px;">87,9%</div>
+        <div class="stat-sub">FR · <span class="fs" style="color:var(--fs)">86,8% FS</span></div>
+      </div>
+    </div>
+
+    <div class="callout">
+      As curvas de FR e FS praticamente se sobrepõem. A hipótese de que FR seria estruturalmente mais concentrado que FS <b>não se confirma</b> — os dois produtos distribuem estoque entre a base de clientes de forma muito parecida. A diferença de volume absoluto (FS é ~7,7x maior em estoque total) não se traduz em diferença de concentração relativa.
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="stat-label" style="margin-bottom:10px;">Top 15 clientes — estoque FR</div>
+        <div style="overflow-x:auto;"><table id="tableTopFR"><thead></thead><tbody></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="stat-label" style="margin-bottom:10px;">Top 15 clientes — estoque FS</div>
+        <div style="overflow-x:auto;"><table id="tableTopFS"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 05 CHURN ============ -->
+  <section id="churn">
+    <div class="section-head">
+      <div class="eyebrow">05 · Churn — Normandia</div>
+      <h2>Churn</h2>
+      <p class="q">Nota de definição: <i>"churn"</i> aqui é o cliente terminar o mês com 0 listings naquele produto — não significa necessariamente que deixou de ser cliente do QuintoAndar (pode manter o outro produto ativo). Análise cliente a cliente usando as Carteiras de Encerramento de fevereiro a julho/26, restrita às 8 praças de Normandia.</p>
+    </div>
+
+    <div class="callout warn">
+      <b>Fev26→Mar26 é um outlier metodológico</b> (churn de FR salta para 18,3% por conta, quase o dobro do padrão dos demais meses) — coincide com o período de ajuste da definição de híbridos no supply de FR. Excluído das médias abaixo; mantido na série apenas para referência visual.
+    </div>
+
+    <div class="section-head" style="margin-top:8px;">
+      <div class="eyebrow">Parte 1</div>
+      <h3 style="font-family:'Fraunces',serif;font-size:19px;margin:0 0 8px;">Quando um cliente zera FR, ele também zera FS?</h3>
+    </div>
+
+    <div class="chart-card">
+      <h3>Volume de FR perdido em churn, por o que aconteceu com o FS do cliente</h3>
+      <p class="sub">Cada barra é 100% do FR perdido naquela transição mensal, dividido entre contas que também zeraram FS e contas que mantiveram FS.</p>
+      <div class="legend-row">
+        <span><span class="dot" style="background:#DAD3C4"></span>Manteve FS ativo</span>
+        <span><span class="dot" style="background:#B4552F"></span>Zerou FS também (churn total de conta)</span>
+      </div>
+      <div class="chart-wrap tall"><canvas id="chartChurnFR"></canvas></div>
+    </div>
+
+    <div class="grid grid-2" style="margin-bottom:20px;">
+      <div class="card">
+        <div class="stat-label">Por contas (4 meses limpos, média)</div>
+        <div class="stat-value" style="color:var(--warn);">43,9%</div>
+        <div class="stat-sub">das contas que zeraram FR também zeraram FS por completo na mesma transição mensal.</div>
+      </div>
+      <div class="card">
+        <div class="stat-label">Por volume de FR perdido (4 meses limpos, média)</div>
+        <div class="stat-value" style="color:var(--warn);">88,4%</div>
+        <div class="stat-sub">do <i>volume</i> de FR perdido em churn vem de contas que zeraram FS por completo no mesmo mês.</div>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <b>Quando uma conta zera FR, na maioria das vezes ela está zerando a base inteira.</b> Usando o critério estrito de "zerou FS por completo" (não apenas queda parcial), 88,4% do volume de FR perdido em churn pertence a contas que estão saindo da base inteira, não ajustando portfólio. <b>A alavanca certa é retenção geral de conta, não gestão isolada de FR.</b>
+    </div>
+
+    <div class="section-head" style="margin-top:32px;">
+      <div class="eyebrow">Parte 2</div>
+      <h3 style="font-family:'Fraunces',serif;font-size:19px;margin:0 0 8px;">Comparativo — representatividade do churn em cada base</h3>
+      <p class="q" style="margin-top:0;">Qual produto perde clientes/listings proporcionalmente mais rápido, dentro de Normandia?</p>
+    </div>
+
+    <div class="chart-card">
+      <h3>Taxa de churn mensal — % de contas ativas que zeram, FR vs FS</h3>
+      <p class="sub">% das contas que tinham o produto ativo no início do mês e terminaram com zero.</p>
+      <div class="legend-row">
+        <span><span class="dot" style="background:#1B3A93"></span>Churn rate FR (contas)</span>
+        <span><span class="dot" style="background:#7A4E6D"></span>Churn rate FS (contas)</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chartChurnRateCompare"></canvas></div>
+    </div>
+
+    <div class="grid grid-4" style="margin-bottom:20px;">
+      <div class="card tight">
+        <div class="stat-label">Churn rate FR (contas)</div>
+        <div class="stat-value fr" style="font-size:22px;">8,11%</div>
+        <div class="stat-sub">média/mês, das contas ativas</div>
+      </div>
+      <div class="card tight">
+        <div class="stat-label">Churn rate FS (contas)</div>
+        <div class="stat-value fs" style="font-size:22px;">7,47%</div>
+        <div class="stat-sub">média/mês, das contas ativas</div>
+      </div>
+      <div class="card tight">
+        <div class="stat-label">Churn rate FR (volume)</div>
+        <div class="stat-value fr" style="font-size:22px;">1,71%</div>
+        <div class="stat-sub">% do estoque perdido/mês</div>
+      </div>
+      <div class="card tight">
+        <div class="stat-label">Churn rate FS (volume)</div>
+        <div class="stat-value fs" style="font-size:22px;">1,66%</div>
+        <div class="stat-sub">% do estoque perdido/mês</div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <b>Dentro de Normandia, FR perde contas proporcionalmente mais que FS</b> (8,11% vs 7,47% das contas ativas por mês). Em volume de listings a diferença praticamente desaparece (1,71% vs 1,66%, quase empatado) — ou seja, as contas que FR perde a mais são, em média, menores do que as que FS perde.
+    </div>
+
+    <div class="card">
+      <div class="stat-label" style="margin-bottom:10px;">Tabela completa — churn mensal por transição (Normandia)</div>
+      <div style="overflow-x:auto;">
+        <table id="tableChurn"><thead></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 06 CARGA VS AQUISIÇÃO ============ -->
+  <section id="carga-vs-aquisicao">
+    <div class="section-head">
+      <div class="eyebrow">06 · Decompondo a liquidez</div>
+      <h2>Carga (uplisting/perda) vs. Aquisição (venda nova/churn)</h2>
+      <p class="q">A liquidez bruta (aba 03) mistura dois fenômenos diferentes: <b>movimento de carga</b> — clientes que já são nossos ajustando quantos listings publicam — e <b>movimento de aquisição</b> — clientes entrando ou saindo da base. Separando os dois, aparece a explicação mais direta para a estagnação de FR.</p>
+    </div>
+
+    <div class="callout warn">
+      <b>Nota metodológica:</b> jan/26 (202601) foi excluído desta análise — é o mês da quebra de metodologia (entrada dos híbridos), que infla artificialmente o uplisting de FR naquele mês e distorceria a média.
+    </div>
+
+    <div class="chart-card">
+      <h3>Net de carga vs. Net de aquisição — % do estoque inicial, por mês</h3>
+      <p class="sub">Net de carga = uplisting − |perda de carga|. Net de aquisição = venda nova − |churn|. Positivo = essa frente contribuiu para o crescimento; negativo = puxou para baixo.</p>
+      <div class="legend-row">
+        <span><span class="dot" style="background:#1B3A93"></span>FR · Net carga</span>
+        <span><span class="dot" style="background:#7C93D6"></span>FR · Net aquisição</span>
+        <span><span class="dot" style="background:#C1572E"></span>FS · Net carga</span>
+        <span><span class="dot" style="background:#E8B48C"></span>FS · Net aquisição</span>
+      </div>
+      <div class="chart-wrap tall"><canvas id="chartCargaAquisicao"></canvas></div>
+    </div>
+
+    <div class="grid grid-2" style="margin-bottom:20px;">
+      <div class="card">
+        <div class="stat-label" style="margin-bottom:10px;">Médias mensais — FR <span class="mono" style="font-size:11px;font-weight:400;">(excl. jan/26)</span></div>
+        <table>
+          <thead><tr><th>Indicador</th><th class="num">% estoque/mês</th></tr></thead>
+          <tbody>
+            <tr><td>Uplisting</td><td class="num">+5,19%</td></tr>
+            <tr><td>Perda de carga</td><td class="num">−5,19%</td></tr>
+            <tr><td style="font-weight:600;">Net carga</td><td class="num" style="font-weight:600;">0,00%</td></tr>
+            <tr><td>Venda nova</td><td class="num">+2,37%</td></tr>
+            <tr><td>Churn</td><td class="num">−1,86%</td></tr>
+            <tr><td style="font-weight:600;">Net aquisição</td><td class="num" style="font-weight:600;color:var(--fr);">+0,51%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="stat-label" style="margin-bottom:10px;">Médias mensais — FS <span class="mono" style="font-size:11px;font-weight:400;">(excl. jan/26)</span></div>
+        <table>
+          <thead><tr><th>Indicador</th><th class="num">% estoque/mês</th></tr></thead>
+          <tbody>
+            <tr><td>Uplisting</td><td class="num">+4,82%</td></tr>
+            <tr><td>Perda de carga</td><td class="num">−4,49%</td></tr>
+            <tr><td style="font-weight:600;">Net carga</td><td class="num" style="font-weight:600;color:var(--fs);">+0,33%</td></tr>
+            <tr><td>Venda nova</td><td class="num">+2,80%</td></tr>
+            <tr><td>Churn</td><td class="num">−2,05%</td></tr>
+            <tr><td style="font-weight:600;">Net aquisição</td><td class="num" style="font-weight:600;color:var(--fs);">+0,75%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="callout">
+      <b>O achado:</b> em FR, uplisting (+5,19%/mês) e perda de carga (−5,19%/mês) se cancelam quase exatamente — a carga existente não contribui em nada, no líquido, para o crescimento. Todo o crescimento de FR vem de um único motor: venda nova superando churn (+0,51%/mês). Em FS, os <b>dois</b> motores empurram para cima: a carga já contribui (+0,33%/mês) e o motor de aquisição é mais forte (+0,75% vs +0,51%). A liquidez bruta de FR é até maior que a de FS (10,4% vs 9,3% — ver aba 03), mas essa movimentação é simétrica e não converte em crescimento; em FS ela é assimétrica a favor do crescimento.
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="stat-label" style="margin-bottom:10px;">Quantos meses cada frente ficou positiva (13 meses, excl. jan/26 → 12 meses)</div>
+        <table>
+          <thead><tr><th>Frente</th><th class="num">FR</th><th class="num">FS</th></tr></thead>
+          <tbody>
+            <tr><td>Net carga positivo</td><td class="num">5 de 12</td><td class="num">7 de 12</td></tr>
+            <tr><td>Net aquisição positivo</td><td class="num">8 de 12</td><td class="num">8 de 12</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="stat-label" style="margin-bottom:10px;">Onde está o gap de aquisição</div>
+        <table>
+          <thead><tr><th></th><th class="num">FR</th><th class="num">FS</th><th class="num">Diferença</th></tr></thead>
+          <tbody>
+            <tr><td>Venda nova</td><td class="num">2,37%</td><td class="num">2,80%</td><td class="num" style="color:var(--warn);">−0,43pp</td></tr>
+            <tr><td>Churn</td><td class="num">1,86%</td><td class="num">2,05%</td><td class="num">−0,19pp</td></tr>
+          </tbody>
+        </table>
+        <p class="stat-sub" style="margin-top:10px;">O gap de aquisição vem mais de <b>venda nova mais fraca</b> em FR do que de churn mais alto — os dois produtos perdem clientes a taxas parecidas, mas FR traz menos clientes novos proporcionalmente ao seu estoque.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stat-label" style="margin-bottom:10px;">Tabela completa — Net carga e Net aquisição por mês</div>
+      <div style="overflow-x:auto;">
+        <table id="tableCargaAquisicao"><thead></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 07 RMS DECOMPOSIÇÃO ============ -->
+  <section id="rms-decomp">
+    <div class="section-head">
+      <div class="eyebrow">07 · Numerador × Denominador, por praça</div>
+      <h2>Por que o RMS de FS sobe e o de FR não?</h2>
+      <p class="q">RMS = nosso supply ÷ supply do concorrente. As diferenças pequenas de carga/aquisição (aba 06) explicam só parte da história — o <b>concorrente</b> também se move diferente para FR e FS, e em algumas praças isso pesa mais que nosso próprio desempenho. Selecione uma praça para ver a decomposição.</p>
+    </div>
+
+    <div class="callout warn">
+      <b>Nota de qualidade de dado — Distrito Federal:</b> a base de concorrência do crawler para DF muda de referência entre dez/25 e jan/26 (o "maior player" reportado muda de forma abrupta), inflando artificialmente o RMS de DF nesse ponto de corte. Trate a série de DF com cautela antes de jan/26 — de fev/26 em diante os números já estão estáveis.
+    </div>
+
+    <div class="chart-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;margin-bottom:4px;">
+        <div>
+          <h3 id="rmsTitle">RMS mensal — Total Normandia</h3>
+          <p class="sub">FR vs FS, nov/25 a jul/26.</p>
+        </div>
+        <div class="praça-picker" id="praçaPicker"></div>
+      </div>
+      <div class="legend-row">
+        <span><span class="dot" style="background:#1B3A93"></span>RMS FR</span>
+        <span><span class="dot" style="background:#C1572E"></span>RMS FS</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chartRmsPorPraça"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Decomposição do Δ RMS mês a mês — <span id="decompTitle">Total Normandia</span></h3>
+      <p class="sub">Cada barra é a variação de RMS no mês; a cor mostra se veio do nosso supply (numerador) ou do concorrente (denominador). Toggle abaixo alterna entre FR e FS.</p>
+      <div class="legend-row" style="justify-content:space-between;">
+        <div style="display:flex;gap:18px;" id="decompLegend">
+          <span><span class="dot" style="background:#1B3A93"></span>Efeito numerador (nosso supply)</span>
+          <span><span class="dot" style="background:#C98A6B"></span>Efeito denominador (concorrente)</span>
+        </div>
+        <div class="fr-fs-toggle" id="frFsToggle">
+          <button class="active" data-prod="fr">FR</button>
+          <button data-prod="fs">FS</button>
+          <button data-prod="both">FR + FS</button>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chartDecompPraça"></canvas></div>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="stat-label" style="margin-bottom:10px;">Nosso supply vs. concorrente — <span id="tableTitle1">Total</span></div>
+        <div style="overflow-x:auto;"><table id="tableSupply"><thead></thead><tbody></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="stat-label" style="margin-bottom:10px;">Decomposição mensal — <span id="tableTitle2">Total</span></div>
+        <div style="overflow-x:auto;"><table id="tableDecomp"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <div class="callout" id="praçaInsight" style="margin-top:20px;">
+      <b>Total Normandia:</b> no acumulado mar→jul/26, ~47% da diferença entre FS e FR vem do nosso próprio supply crescer mais rápido em FS, e ~53% vem do concorrente se mover em direções opostas (FR: concorrente crescendo; FS: concorrente encolhendo).
+    </div>
+  </section>
+
+  <!-- ============ 08 PORTAIS ============ -->
+  <section id="portais">
+    <div class="section-head">
+      <div class="eyebrow">08 · Concentração por operador — Normandia</div>
+      <h2>Quanto do nosso estoque de Normandia vem de "portais" — grandes operadores multi-conta?</h2>
+      <p class="q">Alguns clientes na nossa base não são imobiliárias tradicionais — são agregadores/operadores que publicam grandes volumes sob uma ou mais contas. Isolamos o peso desses operadores no estoque de FR e FS, restrito às 8 praças de Normandia, e ampliamos a busca para identificar outros operadores do mesmo tipo além dos 6 nomes originalmente mapeados.</p>
+    </div>
+
+    <div class="callout warn">
+      <b>Fonte e escopo:</b> Carteira de Encerramento de julho/26, reclassificada por praça com a mesma lógica de macrorregião usada nas demais abas, e filtrada para as 8 praças de Normandia (299.097 listings FR / 3.428.322 listings FS no total). Como a Carteira de Encerramento cobre apenas a carteira comercial com responsável designado (não o supply total da plataforma), os totais aqui são menores que os das abas 01–07 — trate como leitura independente sobre composição, não como extensão da série mensal de estoque.
+    </div>
+
+    <div class="grid grid-2" style="margin-bottom:20px;">
+      <div class="card">
+        <div class="stat-label">6 operadores originalmente mapeados</div>
+        <div class="stat-value fr">5,6%<span style="font-size:14px;color:var(--ink-soft);font-family:'IBM Plex Sans';font-weight:400;"> do FR</span></div>
+        <div class="stat-sub">10,9% do FS. Só Buskaza e Inova de fato operam dentro de Normandia — DreamCasa, Rankim, L4S e Leads4Sales estão fora das 8 praças.</div>
+      </div>
+      <div class="card">
+        <div class="stat-label">+ 12 operadores adicionais identificados</div>
+        <div class="stat-value fs">27,4%<span style="font-size:14px;color:var(--ink-soft);font-family:'IBM Plex Sans';font-weight:400;"> do FR</span></div>
+        <div class="stat-sub">35,2% do FS, somando os 6 originais aos novos candidatos encontrados varrendo o topo do ranking de estoque.</div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Representatividade por operador — FR vs FS (Normandia)</h3>
+      <p class="sub">Inclui os 6 operadores originais e os candidatos adicionais identificados ao varrer o topo da carteira por volume de listings.</p>
+      <div class="legend-row">
+        <span><span class="dot" style="background:#1B3A93"></span>% do estoque FR</span>
+        <span><span class="dot" style="background:#7A4E6D"></span>% do estoque FS</span>
+      </div>
+      <div class="chart-wrap tall"><canvas id="chartPortais"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="stat-label" style="margin-bottom:10px;">Detalhe por operador (Normandia, jul/26)</div>
+      <div style="overflow-x:auto;">
+        <table id="tablePortais"><thead></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <div class="callout warn" style="margin-top:20px;">
+      <b>Como os novos candidatos foram identificados:</b> varremos o topo do ranking de estoque (aba 04) por padrões de nome que sugerem rede/franquia/plataforma em vez de imobiliária independente — nomes com múltiplas contas-variante (ex.: "Lopes One", "Lopes Barão", "Lopes Elite"), operadores especializados em flats (R2 Flats, Rarus Flats, Só Flats), ou empresas conhecidas como proptechs/plataformas (Superlogica, Newcore, Foxter). Esta é uma triagem por padrão de nome e volume — não uma confirmação cadastral de que cada conta é de fato um operador multi-cliente — e vale validação do time comercial antes de qualquer decisão baseada nela.
+    </div>
+
+    <div class="callout" style="margin-top:16px;">
+      <b>Leitura:</b> mesmo restrito a Normandia, FS depende mais desses grandes operadores que FR (35,2% vs 27,4% no total ampliado). A rede Lopes sozinha já responde por 4,55% do FR e 7,15% do FS de Normandia — maior que qualquer um dos 6 operadores originalmente mapeados. Revenda Imóveis aparece sob 3 variantes de conta diferentes, também concentrando bem mais em FS (6,34%) que em FR (1,17%). O padrão se repete: quando esses grandes operadores publicam, publicam desproporcionalmente mais venda do que aluguel — o que ajuda a explicar, em parte, por que o estoque de FS cresce mais rápido: os maiores players do mercado têm um viés estrutural para FS.
+    </div>
+  </section>
+
+  <!-- ============ 09 INICIATIVA DETALHE ============ -->
+  <section id="iniciativa">
+    <div class="section-head">
+      <div class="eyebrow">09 · Iniciativa FR Hunter — raio-x</div>
+      <h2>Motivos de perda, cobertura do funil e o que os executivos reportaram</h2>
+      <p class="q">Detalhamento operacional da iniciativa dedicada de hunting (Nice Santos e Tiago Gonçalves), com base no funil consolidado até o momento — para contextualizar os números de "New sale (Initiative)" que aparecem nas abas anteriores.</p>
+    </div>
+
+    <div class="grid grid-4" style="margin-bottom:20px;">
+      <div class="card tight">
+        <div class="stat-label">Total no funil</div>
+        <div class="stat-value fr" style="font-size:22px;">576</div>
+        <div class="stat-sub">contas mapeadas</div>
+      </div>
+      <div class="card tight">
+        <div class="stat-label">Ganhas</div>
+        <div class="stat-value fr" style="font-size:22px;">27</div>
+        <div class="stat-sub">5.474 opp · 6.496 IWB</div>
+      </div>
+      <div class="card tight">
+        <div class="stat-label">Em negociação</div>
+        <div class="stat-value" style="font-size:22px;color:var(--warn);">30</div>
+        <div class="stat-sub">5.355 opp em jogo</div>
+      </div>
+      <div class="card tight">
+        <div class="stat-label">Perdidas</div>
+        <div class="stat-value" style="font-size:22px;color:#B4552F;">86</div>
+        <div class="stat-sub">17.073 opp perdida</div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Motivos de perda — 86 contas, por volume de oportunidade</h3>
+      <p class="sub">Ordenado pelo volume de listings perdido, não pela contagem de contas — um "nunca respondeu" pode valer muito mais em listings que uma rejeição explícita.</p>
+      <div class="chart-wrap"><canvas id="chartMotivos"></canvas></div>
+    </div>
+
+    <div class="two-col" style="margin-bottom:20px;">
+      <div class="card">
+        <div class="stat-label" style="margin-bottom:10px;">Maiores oportunidades em negociação (top 10)</div>
+        <div style="overflow-x:auto;"><table id="tableNegociacao"><thead></thead><tbody></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="stat-label" style="margin-bottom:10px;">Maiores ganhos fechados (top 10)</div>
+        <div style="overflow-x:auto;"><table id="tableGanhos"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <b>Os "Outro" motivo de perda (7 contas, 1.215 opp) — na palavra dos executivos:</b>
+      <ul style="margin:10px 0 0;padding-left:18px;line-height:1.7;">
+        <li><b>CICLO INCORPORADORA</b> (Tiago): <i>"alega que não precisa de leads, pois tem apenas 5 funcionários e não dão conta dos 150 leads mensais que recebe"</i> — sinal de saturação operacional do cliente, não rejeição comercial.</li>
+        <li><b>bridge consultoria de imóveis</b> (Nice): já tinha os listings ativos via projeto Free — oportunidade dupla-contada, não é perda real.</li>
+        <li><b>Torres Cordeiro</b> (Tiago): fechou negócio em outra conta (2000255688) — também não é perda real, é consolidação.</li>
+        <li><b>A.G RIO IMÓVEIS</b> (Tiago): já tinha conta ativa em Jumbo (2004821924) — cliente já era nosso por outro canal.</li>
+      </ul>
+      <p style="margin:10px 0 0;">De 7 casos "Outro", pelo menos 3 não são perdas de fato — são duplicações ou consolidações de conta já existente. O motivo de perda real e acionável da lista é só o da CICLO INCORPORADORA.</p>
+    </div>
+
+    <div class="card" style="margin-bottom:36px;">
+      <div class="stat-label" style="margin-bottom:10px;">Tabela completa — motivos de perda</div>
+      <div style="overflow-x:auto;">
+        <table id="tableMotivosFull"><thead></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <div class="eyebrow">Cobertura do funil</div>
+      <h2>As 100 maiores oportunidades mapeadas — o que já aconteceu com elas?</h2>
+      <p class="q">Olhando não só quem já ganhou ou está em negociação, mas as 100 contas com maior potencial de listings de todo o funil (576 contas), independente do status atual.</p>
+    </div>
+
+    <div class="grid grid-4" style="margin-bottom:20px;">
+      <div class="card tight">
+        <div class="stat-label">Opp. total do top 100</div>
+        <div class="stat-value fr" style="font-size:22px;">42.145</div>
+        <div class="stat-sub">listings de oportunidade</div>
+      </div>
+      <div class="card tight">
+        <div class="stat-label">Cobertura por interação</div>
+        <div class="stat-value fr" style="font-size:22px;">97,4%</div>
+        <div class="stat-sub">98 de 100 contas já tiveram algum contato</div>
+      </div>
+      <div class="card tight">
+        <div class="stat-label">Convertidas (ganhas)</div>
+        <div class="stat-value" style="font-size:22px;color:var(--warn);">8</div>
+        <div class="stat-sub">2.981 opp · 3.827 IWB refletido</div>
+      </div>
+      <div class="card tight">
+        <div class="stat-label">Perdidas dentro do top 100</div>
+        <div class="stat-value" style="font-size:22px;color:#B4552F;">23</div>
+        <div class="stat-sub">10.718 opp perdida</div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Status atual das 100 maiores oportunidades, por volume</h3>
+      <p class="sub">Cada fatia é o volume de listings de oportunidade (não contagem de contas) no status correspondente.</p>
+      <div class="chart-wrap"><canvas id="chartTop100"></canvas></div>
+    </div>
+
+    <div class="callout">
+      <b>A cobertura de contato é praticamente total (97,4%)</b> — restam apenas 2 contas do top 100 sem nenhuma tentativa de abordagem, incluindo a Imobiliária IMOVEIS PRO PROSPERIDADE (817 opp, carteira do Tiago). O gargalo não está em identificar ou tentar contato com as contas certas — está em <b>converter</b> quem já foi abordado: das 42.145 opp no top 100, apenas 2.981 (7,1%) viraram ganho, enquanto 10.718 (25,4%) já foram classificadas como perdidas e 14.864 (35,3%) ainda estão em "Tentativa de contato" sem resposta.
+    </div>
+
+    <div class="card">
+      <div class="stat-label" style="margin-bottom:10px;">Top 100 por oportunidade — detalhe (30 maiores)</div>
+      <div style="overflow-x:auto;">
+        <table id="tableTop100"><thead></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 10 ORIGEM DAS VENDAS NOVAS FR ============ -->
+  <section id="origem-vendas">
+    <div class="section-head">
+      <div class="eyebrow">10 · De onde vêm as vendas novas de FR (fora da iniciativa)</div>
+      <h2>Quem está trazendo clientes novos de FR na operação orgânica — por time comercial</h2>
+      <p class="q">A categoria "New sale (Other)" do bridge de julho (8.032 listings — aba 01) é venda nova de FR classificada como fora da lista oficial da iniciativa de hunting dedicada. Cruzamos o ID SAP de cada uma dessas 706 contas com a Carteira de Encerramento de julho/26 para identificar o time/proprietário atual responsável por cada uma.</p>
+    </div>
+
+    <div class="chart-card">
+      <h3>Venda nova FR "fora da iniciativa", por time responsável na carteira — julho/26</h3>
+      <p class="sub">8.032 listings, classificados pelo proprietário/papel atual na Carteira de Encerramento (358 de 706 contas sem correspondência de ID SAP na carteira).</p>
+      <div class="chart-wrap"><canvas id="chartOrigemFinal"></canvas></div>
+    </div>
+
+    <div class="grid grid-2" style="margin-bottom:20px;">
+      <div class="card">
+        <div class="stat-label">Maior contribuinte</div>
+        <div class="stat-value fr">Jumbo</div>
+        <div class="stat-sub">3.547 listings — 44,2% do total</div>
+      </div>
+      <div class="card">
+        <div class="stat-label">Contas sem correspondência na carteira</div>
+        <div class="stat-value fs">511<span style="font-size:14px;color:var(--ink-soft);font-family:'IBM Plex Sans';font-weight:400;"> listings</span></div>
+        <div class="stat-sub">358 de 706 contas (ID SAP nulo ou não encontrado na carteira de julho)</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stat-label" style="margin-bottom:10px;">Detalhe por time</div>
+      <table id="tableOrigemFinal"><thead></thead><tbody></tbody></table>
+    </div>
+
+    <div class="callout warn">
+      <b>Achado que pede atenção:</b> 2.763 dos 8.032 listings (34,4%) foram classificados como "Hunter" pela carteira — bem acima do esperado para uma categoria definida como "fora da iniciativa". Investigando caso a caso, a causa é clara: o papel "Executivo Hunters Inbound/Outbound — BR" na carteira é ocupado por um time bem mais amplo do que os 2 hunters dedicados à iniciativa (Nice Santos e Tiago Gonçalves) — nomes como Davino Basilio, Andressa Silva, Priscila Pinto e Zenaide Ribeiro também carregam esse papel. Ou seja, essas 8.032 vendas realmente não passaram pela iniciativa específica que este documento acompanha (por isso aparecem como "Orgânico" no bridge), mas uma fatia relevante delas foi fechada por <i>outros</i> executivos que também têm função de hunting, só que fora do escopo dos 2 nomes monitorados aqui.
+    </div>
+
+    <div class="callout">
+      Descontando essa fatia de "Hunter" (papel amplo, não a iniciativa específica), a distribuição fica: Jumbo (3.547), Middle (660), Relacionamento (273), Regional DF (158) e C2C (120) — juntos, 4.758 listings (59,2% do total) vindos de times de carteira tradicional. Vale mapear os nomes específicos por trás do papel "Hunter" nesta base para confirmar se são hunters de outra frente (ex.: hunting de FS, ou um time de prospecção mais amplo do que o projeto aqui documentado).
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p style="font-weight:600;color:var(--ink);margin-bottom:8px;">Notas metodológicas</p>
+  <ul class="caveat-list">
+    <li>Período analisado: 202508 a 202608 (ago/25–ago/26). O período 202609 foi excluído por estar com dados incompletos no momento da extração (fechamento ainda não consolidado).</li>
+    <li>Quebra de metodologia em jan/26 (202601): anúncios híbridos (venda + aluguel) passaram a contar simultaneamente como FR e FS a partir dessa data, causando um salto de estoque que não reflete crescimento orgânico real. Todas as leituras de tendência devem considerar essa quebra.</li>
+    <li>Concentração de estoque calculada sobre a última semana fechada disponível, considerando toda a base nacional ativa em FR e/ou FS (sem filtro de praça).</li>
+    <li>Critério de "levou FS junto — parcial relevante": queda de FS ≥ 20% no mesmo mês em que o cliente zerou FR, seguindo o mesmo racional aplicado a "venda nova (cliente existente, tinha FS)".</li>
+    <li>Fontes: Base Bridge FR (ago/25–ago/26), Bridge FS equivalente, extração de concentração de estoque (última semana), e decomposição de impacto de churn — todas geradas via BigQuery a partir de <span class="mono">vw_leads_and_listings</span>.</li>
+  </ul>
+</footer>
+
+<script>
+// ============ NAVIGATION ============
+const buttons = document.querySelectorAll('#tabs button');
+const sections = document.querySelectorAll('main section');
+buttons.forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    buttons.forEach(b=>b.classList.remove('active'));
+    sections.forEach(s=>s.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.target).classList.add('active');
+    window.scrollTo({top:0, behavior:'instant'});
+  });
+});
+
+// ============ SHARED DATA ============
+const periodos = [202508,202509,202510,202511,202512,202601,202602,202603,202604,202605,202606,202607,202608];
+const labels = ['ago/25','set/25','out/25','nov/25','dez/25','jan/26','fev/26','mar/26','abr/26','mai/26','jun/26','jul/26','ago/26'];
+
+const frData = {
+  vendaNova:   [11937,5862,16483,11495,9604,18201,13102,7285,11440,7262,14807,11294,1929],
+  uplisting:   [19783,22357,38667,15163,16640,104177,15963,24587,21839,27981,27677,25026,14151],
+  perdaCarga:  [-14987,-18928,-16732,-34405,-14699,-11768,-32772,-28162,-23432,-22781,-28559,-27091,-12960],
+  churn:       [-12201,-4739,-12678,-9241,-5734,-7811,-9160,-8703,-5577,-7160,-5958,-11555,-3289],
+  final:       [371085,375637,401377,384389,390200,492999,480132,475139,479409,484711,492678,490352,490183]
+};
+const fsData = {
+  vendaNova:   [113314,89107,149182,59102,65853,91844,160123,97785,124229,84668,98029,133248,26798],
+  uplisting:   [143051,146169,141579,243291,122932,139568,140330,253982,129532,265566,206352,198341,97178],
+  perdaCarga:  [-99972,-87313,-190462,-94134,-85978,-134947,-191622,-143621,-381766,-170518,-244955,-201518,-75768],
+  churn:       [-129538,-48239,-147550,-69842,-68298,-57806,-52085,-72565,-38214,-65383,-56489,-85424,-44598],
+  final:       [3319072,3418796,3371545,3509962,3544471,3583130,3639876,3775457,3609238,3723571,3726508,3771155,3774765]
+};
+function netArr(d){ return d.vendaNova.map((v,i)=>v+d.uplisting[i]+d.perdaCarga[i]+d.churn[i]); }
+frData.net = netArr(frData);
+fsData.net = netArr(fsData);
+
+const liquidezFR = [16.1,14.0,22.5,17.5,12.1,36.4,14.4,14.3,13.1,13.6,15.9,15.2,6.6];
+const liquidezFS = [14.8,11.2,18.4,13.8,9.8,12.0,15.2,15.6,17.8,16.2,16.3,16.6,6.5];
+
+// ============ CHART CONFIG HELPERS ============
+Chart.defaults.font.family = "'IBM Plex Sans', sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.color = '#5B564C';
+
+function fmt(n){ return new Intl.NumberFormat('pt-BR').format(Math.round(n)); }
+
+function bridgeChart(ctx, d, colors){
+  return new Chart(ctx, {
+    data:{
+      labels: labels,
+      datasets:[
+        {type:'bar', label:'Venda nova', data:d.vendaNova, backgroundColor:colors.vendaNova, stack:'s', borderRadius:2},
+        {type:'bar', label:'Uplisting', data:d.uplisting, backgroundColor:colors.uplisting, stack:'s', borderRadius:2},
+        {type:'bar', label:'Perda de carga', data:d.perdaCarga, backgroundColor:colors.perdaCarga, stack:'s', borderRadius:2},
+        {type:'bar', label:'Churn', data:d.churn, backgroundColor:colors.churn, stack:'s', borderRadius:2},
+        {type:'line', label:'Net change', data:d.net, borderColor:'#1E1B16', backgroundColor:'#1E1B16',
+         borderWidth:2, pointRadius:3, pointBackgroundColor:'#1E1B16', tension:.25, order:0}
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#1E1B16', padding:10, titleFont:{weight:600},
+          callbacks:{ label: (c)=> `${c.dataset.label}: ${fmt(c.parsed.y)}` }
+        }
+      },
+      scales:{
+        x:{grid:{display:false}},
+        y:{grid:{color:'#EFEBE2'}, ticks:{callback:(v)=>fmt(v)}}
+      }
+    }
+  });
+}
+
+bridgeChart(document.getElementById('chartBridgeFR'), frData, {
+  vendaNova:'#1B3A93', uplisting:'#7C93D6', perdaCarga:'#C98A6B', churn:'#B4552F'
+});
+bridgeChart(document.getElementById('chartBridgeFS'), fsData, {
+  vendaNova:'#C1572E', uplisting:'#E0A480', perdaCarga:'#C98A6B', churn:'#B4552F'
+});
+
+// ============ LIQUIDEZ CHART ============
+new Chart(document.getElementById('chartLiquidez'), {
+  type:'line',
+  data:{
+    labels: labels,
+    datasets:[
+      {label:'FR', data: liquidezFR, borderColor:'#1B3A93', backgroundColor:'#1B3A9322', fill:true, tension:.3, pointRadius:3},
+      {label:'FS', data: liquidezFS, borderColor:'#C1572E', backgroundColor:'#C1572E15', fill:true, tension:.3, pointRadius:3}
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false},
+      tooltip:{ backgroundColor:'#1E1B16', padding:10, callbacks:{ label:(c)=>`${c.dataset.label}: ${c.parsed.y}%` } } },
+    scales:{
+      x:{grid:{display:false}},
+      y:{grid:{color:'#EFEBE2'}, ticks:{callback:(v)=>v+'%'}}
+    }
+  }
+});
+
+// ============ CONCENTRACAO CHART ============
+const frCurve = [[1,5.8],[5,14.3],[10,20.1],[20,28.6],[30,34.1],[50,40.8],[75,46.4],[100,50.7],[150,57.2],[200,62.0],[300,68.7],[500,77.1],[750,83.6],[1000,87.9],[1500,92.8],[2000,95.4],[3000,98.0],[4000,99.1],[5000,99.6],[6813,100.0]];
+const fsCurve = [[1,3.2],[5,13.3],[10,18.9],[20,26.2],[30,31.9],[50,39.9],[75,46.6],[100,51.3],[150,57.9],[200,62.7],[300,69.3],[500,77.3],[750,83.1],[1000,86.8],[1500,91.4],[2000,93.9],[3000,96.8],[4000,98.2],[5000,99.0],[6000,99.4],[8000,99.8],[10000,99.9],[13755,100.0]];
+
+new Chart(document.getElementById('chartConcentracao'), {
+  type:'line',
+  data:{
+    datasets:[
+      {label:'FR', data: frCurve.map(p=>({x:p[0],y:p[1]})), borderColor:'#1B3A93', backgroundColor:'#1B3A9322', fill:true, tension:.2, pointRadius:2},
+      {label:'FS', data: fsCurve.map(p=>({x:p[0],y:p[1]})), borderColor:'#C1572E', backgroundColor:'#C1572E15', fill:true, tension:.2, pointRadius:2}
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false},
+      tooltip:{ backgroundColor:'#1E1B16', padding:10,
+        callbacks:{ title:(items)=>`Top ${fmt(items[0].parsed.x)} clientes`, label:(c)=>`${c.dataset.label}: ${c.parsed.y}% do estoque` } } },
+    scales:{
+      x:{type:'logarithmic', title:{display:true,text:'Nº de clientes (escala log)',color:'#5B564C',font:{size:11}}, grid:{color:'#EFEBE2'}},
+      y:{min:0,max:100, grid:{color:'#EFEBE2'}, ticks:{callback:(v)=>v+'%'}, title:{display:true,text:'% acumulado do estoque',color:'#5B564C',font:{size:11}}}
+    }
+  }
+});
+
+// ============ CHURN CHART (Normandia, via carteira) ============
+const labelsChurnNorm = ['Fev→Mar','Mar→Abr','Abr→Mai','Mai→Jun','Jun→Jul'];
+const churnNorm = {
+  fr_perdido:   [17591, 2347, 4749, 5035, 7768],
+  fr_leva_fs:   [8789,  1794, 4398, 4671, 7118],
+  contas_zerou_fr:    [727, 216, 330, 343, 362],
+  contas_zerou_ambos: [298, 67, 162, 162, 174],
+  churn_rate_fr_contas: [18.28, 5.99, 8.60, 8.77, 9.06],
+  churn_rate_fs_contas: [13.96, 5.09, 7.27, 8.42, 9.10],
+};
+churnNorm.fr_mantem_fs = churnNorm.fr_perdido.map((v,i)=> v - churnNorm.fr_leva_fs[i]);
+
+new Chart(document.getElementById('chartChurnFR'), {
+  type:'bar',
+  data:{
+    labels: labelsChurnNorm,
+    datasets:[
+      {label:'Manteve FS ativo', data: churnNorm.fr_mantem_fs, backgroundColor:'#DAD3C4', stack:'s', borderRadius:2},
+      {label:'Zerou FS também', data: churnNorm.fr_leva_fs, backgroundColor:'#B4552F', stack:'s', borderRadius:2}
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false},
+      tooltip:{ backgroundColor:'#1E1B16', padding:10, mode:'index', intersect:false,
+        callbacks:{ label:(c)=>`${c.dataset.label}: ${fmt(c.parsed.y)} listings FR` } } },
+    scales:{
+      x:{grid:{display:false}, stacked:true},
+      y:{stacked:true, grid:{color:'#EFEBE2'}, ticks:{callback:(v)=>fmt(v)}, title:{display:true,text:'Listings FR perdidos em churn',color:'#5B564C',font:{size:11}}}
+    }
+  }
+});
+
+// ============ TABLES ============
+function buildBridgeTable(tableId, d, prefix){
+  const table = document.getElementById(tableId);
+  const thead = table.querySelector('thead');
+  const tbody = table.querySelector('tbody');
+  thead.innerHTML = `<tr><th>Mês</th><th class="num">Venda nova</th><th class="num">Uplisting</th><th class="num">Perda de carga</th><th class="num">Churn</th><th class="num">Net change</th><th class="num">Estoque final</th></tr>`;
+  tbody.innerHTML = labels.map((l,i)=>`
+    <tr>
+      <td>${l}</td>
+      <td class="num">${d.vendaNova[i]>=0?'+':''}${fmt(d.vendaNova[i])}</td>
+      <td class="num">${d.uplisting[i]>=0?'+':''}${fmt(d.uplisting[i])}</td>
+      <td class="num">${fmt(d.perdaCarga[i])}</td>
+      <td class="num">${fmt(d.churn[i])}</td>
+      <td class="num" style="font-weight:600;">${d.net[i]>=0?'+':''}${fmt(d.net[i])}</td>
+      <td class="num">${fmt(d.final[i])}</td>
+    </tr>`).join('');
+}
+buildBridgeTable('tableBridgeFR', frData, 'FR');
+buildBridgeTable('tableBridgeFS', fsData, 'FS');
+
+function buildTopTable(tableId, rows, tagClass){
+  const table = document.getElementById(tableId);
+  table.querySelector('thead').innerHTML = `<tr><th>Cliente</th><th>Praça</th><th class="num">FR</th><th class="num">FS</th></tr>`;
+  table.querySelector('tbody').innerHTML = rows.map(r=>`
+    <tr>
+      <td>${r[0]}</td>
+      <td><span class="tag ${tagClass}">${r[1]}</span></td>
+      <td class="num">${fmt(r[2])}</td>
+      <td class="num">${fmt(r[3])}</td>
+    </tr>`).join('');
+}
+buildTopTable('tableTopFR', [
+  ["QuintoAndar","GRANDE SP",28216,107552],
+  ["DreamCasa","GRANDE SP",15707,87273],
+  ["Paulo Roberto Leardi","GRANDE SP",11794,38639],
+  ["SUA QUADRA","GRANDE SP",7991,0],
+  ["LEADS4SALES","GRANDE SP",6518,23418],
+  ["QuintoAndar","GRANDE SP",6493,10010],
+  ["RARUS FLATS","GRANDE SP",6229,2974],
+  ["Paulo Roberto Leardi - Nova Central","GRANDE SP",5654,26904],
+  ["Lopes One","GRANDE SP",5100,37092],
+  ["R2FLATS","GRANDE SP",4923,8],
+  ["RARUS FLATS","GRANDE SP",4717,3998],
+  ["LEADS4SALES","SP Int e Lit",4650,19848],
+  ["BUSKAZA","RIO DE JANEIRO",4648,103909],
+  ["DreamCasa","SP Int e Lit",4371,29303],
+  ["Lopes Prime Imóveis","GRANDE SP",4224,16840]
+], 'fr');
+buildTopTable('tableTopFS', [
+  ["Rankim Soluções","GRANDE SP",431,121851],
+  ["QuintoAndar","GRANDE SP",28216,107552],
+  ["BUSKAZA","RIO DE JANEIRO",4648,103909],
+  ["DreamCasa","GRANDE SP",15707,87273],
+  ["Revenda Imóveis","GRANDE SP",1776,80756],
+  ["BUSKAZA","BELO HORIZONTE",3855,54813],
+  ["Revenda Imóveis","GRANDE SP",1097,49508],
+  ["Paulo Roberto Leardi","GRANDE SP",11794,38639],
+  ["Lopes One","GRANDE SP",5100,37092],
+  ["Auxiliadora Franquias Ltda","PORTO ALEGRE",3321,33442],
+  ["Inova Plataforma de Integracao Ltda","BELO HORIZONTE",2781,31530],
+  ["Revenda Imóvel","GRANDE SP",1,30910],
+  ["Foxter","PORTO ALEGRE",0,29331],
+  ["DreamCasa","SP Int e Lit",4371,29303],
+  ["Lopes Barão","GRANDE SP",3769,27824]
+], 'fs');
+
+function buildChurnTable(){
+  const table = document.getElementById('tableChurn');
+  table.querySelector('thead').innerHTML = `<tr><th>Transição</th><th class="num">Contas zerou FR</th><th class="num">Contas zerou ambos</th><th class="num">FR perdido</th><th class="num">FR perdido c/ FS junto</th><th class="num">% leva FS</th><th class="num">Churn rate FR (contas)</th><th class="num">Churn rate FS (contas)</th></tr>`;
+  const rows = labelsChurnNorm.map((l,i)=>{
+    const pctLevou = (churnNorm.fr_leva_fs[i]/churnNorm.fr_perdido[i]*100).toFixed(1);
+    const isOutlier = i===0;
+    return `<tr${isOutlier?' style="opacity:0.55;"':''}>
+      <td>${l}${isOutlier?' <span class="mono" style="font-size:10px;">(outlier)</span>':''}</td>
+      <td class="num">${fmt(churnNorm.contas_zerou_fr[i])}</td>
+      <td class="num">${fmt(churnNorm.contas_zerou_ambos[i])}</td>
+      <td class="num">${fmt(churnNorm.fr_perdido[i])}</td>
+      <td class="num" style="font-weight:600;color:#B4552F;">${fmt(churnNorm.fr_leva_fs[i])}</td>
+      <td class="num">${pctLevou}%</td>
+      <td class="num">${churnNorm.churn_rate_fr_contas[i]}%</td>
+      <td class="num">${churnNorm.churn_rate_fs_contas[i]}%</td>
+    </tr>`;
+  }).join('');
+  table.querySelector('tbody').innerHTML = rows;
+}
+buildChurnTable();
+
+// Churn rate comparativo FR vs FS (Normandia, via carteira)
+new Chart(document.getElementById('chartChurnRateCompare'), {
+  type:'line',
+  data:{
+    labels: labelsChurnNorm,
+    datasets:[
+      {label:'FR', data: churnNorm.churn_rate_fr_contas, borderColor:'#1B3A93', backgroundColor:'#1B3A9322', fill:true, tension:.3, pointRadius:3},
+      {label:'FS', data: churnNorm.churn_rate_fs_contas, borderColor:'#7A4E6D', backgroundColor:'#7A4E6D15', fill:true, tension:.3, pointRadius:3}
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}, tooltip:{backgroundColor:'#1E1B16', padding:10, callbacks:{label:(c)=>`${c.dataset.label}: ${c.parsed.y}%`}}},
+    scales:{ x:{grid:{display:false}}, y:{grid:{color:'#EFEBE2'}, ticks:{callback:(v)=>v+'%'}} }
+  }
+});
+
+
+// ============ 06 CARGA VS AQUISIÇÃO ============
+// Excluindo jan/26 (índice 5 na série de 13 meses) — outlier metodológico
+const labelsNoJan = labels.filter((_,i)=>i!==5);
+const idxNoJan = [0,1,2,3,4,6,7,8,9,10,11,12];
+
+function rate(arr, stock){ return idxNoJan.map(i=> arr[i]/stock[i]*100 ); }
+
+const stockFRInicial = [366553,371085,375637,401377,384389,390200,492999,480132,475139,479409,484711,492678,490352];
+const stockFSInicial = [3292217,3319072,3418796,3371545,3509962,3544471,3583130,3639876,3775457,3609238,3723571,3726508,3771155];
+
+const frUplistingRate = rate(frData.uplisting, stockFRInicial);
+const frPerdaRate     = rate(frData.perdaCarga, stockFRInicial); // já negativo
+const frVendaRate     = rate(frData.vendaNova, stockFRInicial);
+const frChurnRate     = rate(frData.churn, stockFRInicial); // já negativo
+
+const fsUplistingRate = rate(fsData.uplisting, stockFSInicial);
+const fsPerdaRate     = rate(fsData.perdaCarga, stockFSInicial);
+const fsVendaRate     = rate(fsData.vendaNova, stockFSInicial);
+const fsChurnRate     = rate(fsData.churn, stockFSInicial);
+
+const frNetCarga = frUplistingRate.map((v,i)=> v + frPerdaRate[i]);
+const frNetAquis = frVendaRate.map((v,i)=> v + frChurnRate[i]);
+const fsNetCarga = fsUplistingRate.map((v,i)=> v + fsPerdaRate[i]);
+const fsNetAquis = fsVendaRate.map((v,i)=> v + fsChurnRate[i]);
+
+new Chart(document.getElementById('chartCargaAquisicao'), {
+  type:'line',
+  data:{
+    labels: labelsNoJan,
+    datasets:[
+      {label:'FR · Net carga', data: frNetCarga, borderColor:'#1B3A93', backgroundColor:'#1B3A93', tension:.3, pointRadius:3, borderWidth:2.5},
+      {label:'FR · Net aquisição', data: frNetAquis, borderColor:'#7C93D6', backgroundColor:'#7C93D6', tension:.3, pointRadius:3, borderWidth:2, borderDash:[5,3]},
+      {label:'FS · Net carga', data: fsNetCarga, borderColor:'#C1572E', backgroundColor:'#C1572E', tension:.3, pointRadius:3, borderWidth:2.5},
+      {label:'FS · Net aquisição', data: fsNetAquis, borderColor:'#E8B48C', backgroundColor:'#E8B48C', tension:.3, pointRadius:3, borderWidth:2, borderDash:[5,3]}
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false},
+      tooltip:{ backgroundColor:'#1E1B16', padding:10,
+        callbacks:{ label:(c)=>`${c.dataset.label}: ${c.parsed.y.toFixed(2)}%` } } },
+    scales:{
+      x:{grid:{display:false}},
+      y:{grid:{color:'#EFEBE2'}, ticks:{callback:(v)=>v.toFixed(0)+'%'},
+         title:{display:true,text:'% do estoque inicial',color:'#5B564C',font:{size:11}}}
+    }
+  }
+});
+
+function buildCargaAquisicaoTable(){
+  const table = document.getElementById('tableCargaAquisicao');
+  table.querySelector('thead').innerHTML = `<tr><th>Mês</th><th class="num">FR Net carga</th><th class="num">FR Net aquisição</th><th class="num">FS Net carga</th><th class="num">FS Net aquisição</th></tr>`;
+  table.querySelector('tbody').innerHTML = labelsNoJan.map((l,i)=>`
+    <tr>
+      <td>${l}</td>
+      <td class="num" style="color:${frNetCarga[i]>=0?'#1B3A93':'#B4552F'}">${frNetCarga[i]>=0?'+':''}${frNetCarga[i].toFixed(2)}%</td>
+      <td class="num" style="color:${frNetAquis[i]>=0?'#1B3A93':'#B4552F'}">${frNetAquis[i]>=0?'+':''}${frNetAquis[i].toFixed(2)}%</td>
+      <td class="num" style="color:${fsNetCarga[i]>=0?'#C1572E':'#B4552F'}">${fsNetCarga[i]>=0?'+':''}${fsNetCarga[i].toFixed(2)}%</td>
+      <td class="num" style="color:${fsNetAquis[i]>=0?'#C1572E':'#B4552F'}">${fsNetAquis[i]>=0?'+':''}${fsNetAquis[i].toFixed(2)}%</td>
+    </tr>`).join('');
+}
+buildCargaAquisicaoTable();
+
+// ============ 07 RMS DECOMPOSIÇÃO POR PRAÇA ============
+const rmsRaw = {"labels": ["Nov25", "Dec25", "Jan26", "Feb26", "Mar26", "Apr26", "May26", "Jun26", "Jul26"], "labelsDelta": ["Dec25", "Jan26", "Feb26", "Mar26", "Apr26", "May26", "Jun26", "Jul26"], "pra\u00e7as": ["Total", "Grande SP", "SP Int e Lit", "Distrito Federal", "Curitiba", "Belo Horizonte", "Rio de Janeiro", "Porto Alegre", "Goiania"], "data": {"Total": {"rms_fr": [0.562, 0.57, 0.751, 0.825, 0.777, 0.769, 0.775, 0.77, 0.781], "rms_fs": [0.997, 0.998, 1.051, 1.179, 1.179, 1.12, 1.158, 1.151, 1.185], "num_fr": [0.0085, 0.1565, -0.0222, -0.0082, 0.0069, 0.0085, 0.0125, -0.0037], "den_fr": [-0.0007, 0.0239, 0.0965, -0.0402, -0.0141, -0.0034, -0.0174, 0.015], "num_fs": [0.0096, 0.0114, 0.0185, 0.0422, -0.0515, 0.0358, 0.0009, 0.0138], "den_fs": [-0.0091, 0.0419, 0.1094, -0.0422, -0.0068, 0.0021, -0.0079, 0.0202], "nosso_fr": [384400.0, 390200.0, 493000.0, 480100.0, 475100.0, 479400.0, 484700.0, 492700.0, 490400.0], "nosso_fs": [3510000.0, 3544000.0, 3583000.0, 3640000.0, 3775000.0, 3609000.0, 3724000.0, 3727000.0, 3771000.0], "conc_fr": [683419.0, 684230.0, 656688.0, 581904.0, 611672.0, 623015.0, 625755.0, 640168.0, 627894.0], "conc_fs": [3520400.0, 3552666.0, 3409598.0, 3088138.0, 3202672.0, 3221240.0, 3215324.0, 3237522.0, 3181666.0]}, "Grande SP": {"rms_fr": [0.56, 0.57, 0.767, 0.874, 0.79, 0.769, 0.766, 0.763, 0.784], "rms_fs": [1.041, 1.049, 1.103, 1.296, 1.293, 1.18, 1.237, 1.198, 1.275], "num_fr": [0.0066, 0.1677, -0.0205, -0.0225, -0.0037, -0.002, 0.0048, 0.0027], "den_fr": [0.0029, 0.0299, 0.1274, -0.0618, -0.0177, -0.0006, -0.0079, 0.0184], "num_fs": [0.0143, 0.0083, 0.0511, 0.0582, -0.0725, 0.0503, -0.0263, 0.0548], "den_fs": [-0.0068, 0.0455, 0.1424, -0.0615, -0.0402, 0.0059, -0.0118, 0.0219], "nosso_fr": [256600.0, 259600.0, 332200.0, 324600.0, 315600.0, 314100.0, 313300.0, 315300.0, 316400.0], "nosso_fs": [1956000.0, 1983000.0, 1998000.0, 2080000.0, 2178000.0, 2052000.0, 2139000.0, 2093000.0, 2187000.0], "conc_fr": [457897.0, 455564.0, 432857.0, 371239.0, 399478.0, 408633.0, 408932.0, 413171.0, 403448.0], "conc_fs": [1878121.0, 1890419.0, 1811749.0, 1604513.0, 1684437.0, 1738503.0, 1729856.0, 1746504.0, 1715172.0]}, "SP Int e Lit": {"rms_fr": [0.615, 0.62, 0.888, 0.901, 0.975, 1.003, 1.048, 1.005, 1.005], "rms_fs": [0.981, 0.98, 1.064, 1.112, 1.183, 1.18, 1.25, 1.213, 1.224], "num_fr": [0.0047, 0.2419, -0.0472, 0.0618, 0.045, 0.042, 0.0387, -0.0423], "den_fr": [0.0006, 0.0261, 0.0602, 0.0127, -0.0169, 0.003, -0.0821, 0.0424], "num_fs": [0.0198, 0.0296, -0.0318, 0.0658, -0.0095, 0.0407, 0.0, -0.0351], "den_fs": [-0.0205, 0.0544, 0.0797, 0.005, 0.0067, 0.0288, -0.0366, 0.0462], "nosso_fr": [65200.0, 65700.0, 90300.0, 85800.0, 91600.0, 95900.0, 99900.0, 103900.0, 99700.0], "nosso_fs": [582000.0, 594000.0, 611000.0, 594000.0, 629000.0, 624000.0, 645000.0, 645000.0, 627000.0], "conc_fr": [106086.0, 105980.0, 101696.0, 95242.0, 93923.0, 95580.0, 95296.0, 103398.0, 99216.0], "conc_fs": [593432.0, 606094.0, 574217.0, 534207.0, 531799.0, 528789.0, 516187.0, 531742.0, 512243.0]}, "Distrito Federal": {"rms_fr": [2.562, 2.616, 1.116, 1.088, 1.028, 1.034, 0.989, 0.978, 1.017], "rms_fs": [2.209, 2.249, 1.132, 1.052, 1.01, 1.003, 0.961, 0.965, 0.95], "num_fr": [0.0, null, -0.0153, -0.0298, 0.0148, -0.0291, 0.0142, 0.0145], "den_fr": [0.0536, null, -0.0127, -0.03, -0.0088, -0.0162, -0.0254, 0.0243], "num_fs": [-0.0577, null, -0.0526, -0.0259, -0.0264, -0.026, 0.0, -0.0264], "den_fs": [0.0983, null, -0.0274, -0.0156, 0.0187, -0.0161, 0.004, 0.0119], "nosso_fr": [7000.0, 7000.0, 7200.0, 7100.0, 6900.0, 7000.0, 6800.0, 6900.0, 7000.0], "nosso_fs": [40000.0, 39000.0, 42000.0, 40000.0, 39000.0, 38000.0, 37000.0, 37000.0, 36000.0], "conc_fr": [2732.0, 2676.0, 6450.0, 6524.0, 6709.0, 6767.0, 6875.0, 7056.0, 6885.0], "conc_fs": [18110.0, 17338.0, 37104.0, 38024.0, 38597.0, 37894.0, 38511.0, 38351.0, 37882.0]}, "Curitiba": {"rms_fr": [1.003, 0.974, 1.075, 1.147, 1.094, 1.175, 1.138, 1.194, 1.046], "rms_fs": [1.225, 1.257, 1.314, 1.274, 1.187, 1.266, 1.224, 1.288, 1.257], "num_fr": [-0.0244, 0.0632, -0.042, 0.0386, 0.0894, 0.0359, 0.0124, -0.0222], "den_fr": [-0.0039, 0.0375, 0.1135, -0.0911, -0.0087, -0.0728, 0.0435, -0.1262], "num_fs": [-0.0135, -0.0438, -0.0143, -0.0135, -0.0145, 0.0408, 0.0, 0.0], "den_fs": [0.046, 0.1009, -0.0259, -0.0741, 0.0935, -0.0828, 0.0645, -0.0308], "nosso_fr": [8200.0, 8000.0, 8500.0, 8200.0, 8500.0, 9200.0, 9500.0, 9600.0, 9400.0], "nosso_fs": [94000.0, 93000.0, 90000.0, 89000.0, 88000.0, 87000.0, 90000.0, 90000.0, 90000.0], "conc_fr": [8178.0, 8210.0, 7906.0, 7151.0, 7768.0, 7830.0, 8347.0, 8040.0, 8990.0], "conc_fs": [76743.0, 73963.0, 68471.0, 69850.0, 74162.0, 68743.0, 73558.0, 69872.0, 71581.0]}, "Belo Horizonte": {"rms_fr": [0.484, 0.479, 0.518, 0.62, 0.617, 0.598, 0.623, 0.62, 0.573], "rms_fs": [0.903, 0.863, 0.885, 1.167, 0.996, 0.975, 1.014, 1.094, 1.04], "num_fr": [0.0154, 0.013, 0.0783, -0.0069, -0.0171, 0.0522, 0.0096, -0.0378], "den_fr": [-0.0208, 0.0262, 0.0237, 0.0044, -0.0027, -0.0269, -0.0122, -0.0095], "num_fs": [-0.0096, 0.0, 0.1571, -0.1001, -0.0265, 0.032, 0.0442, -0.0495], "den_fs": [-0.0305, 0.0217, 0.125, -0.0708, 0.0056, 0.0069, 0.036, -0.0051], "nosso_fr": [15000.0, 15500.0, 15900.0, 18200.0, 18000.0, 17500.0, 19100.0, 19400.0, 18200.0], "nosso_fs": [182000.0, 180000.0, 180000.0, 208000.0, 189000.0, 184000.0, 190000.0, 198000.0, 189000.0], "conc_fr": [30996.0, 32390.0, 30707.0, 29362.0, 29155.0, 29282.0, 30662.0, 31275.0, 31763.0], "conc_fs": [201502.0, 208555.0, 203443.0, 178257.0, 189771.0, 188707.0, 187379.0, 180956.0, 181806.0]}, "Rio de Janeiro": {"rms_fr": [0.474, 0.462, 0.603, 0.616, 0.587, 0.601, 0.622, 0.663, 0.655], "rms_fs": [0.752, 0.757, 0.774, 0.829, 0.93, 0.792, 0.803, 0.836, 0.82], "num_fr": [-0.0096, 0.1232, -0.0285, -0.0175, 0.0105, 0.0311, 0.0349, 0.0], "den_fr": [-0.0027, 0.0177, 0.0419, -0.0116, 0.0033, -0.0099, 0.006, -0.008], "num_fs": [0.0, -0.0185, -0.0385, 0.1238, -0.1486, -0.003, 0.0601, -0.0507], "den_fs": [0.0055, 0.0356, 0.0926, -0.0221, 0.0107, 0.014, -0.0278, 0.0347], "nosso_fr": [14700.0, 14400.0, 18100.0, 17300.0, 16800.0, 17100.0, 18000.0, 19000.0, 19000.0], "nosso_fs": [300000.0, 300000.0, 293000.0, 280000.0, 323000.0, 272000.0, 271000.0, 292000.0, 275000.0], "conc_fr": [31012.0, 31191.0, 30039.0, 28087.0, 28624.0, 28466.0, 28941.0, 28665.0, 29017.0], "conc_fs": [398999.0, 396114.0, 378347.0, 337924.0, 347198.0, 343238.0, 337281.0, 349391.0, 335468.0]}, "Porto Alegre": {"rms_fr": [0.421, 0.472, 0.507, 0.489, 0.439, 0.458, 0.446, 0.443, 0.495], "rms_fs": [1.185, 1.181, 1.328, 1.304, 1.202, 1.386, 1.297, 1.489, 1.399], "num_fr": [0.061, 0.027, -0.055, -0.0276, 0.0167, -0.0139, 0.0134, 0.0487], "den_fr": [-0.0098, 0.0084, 0.0363, -0.0227, 0.0029, 0.0014, -0.016, 0.0031], "num_fs": [0.0038, 0.0697, -0.0858, -0.0367, 0.0797, 0.0, 0.1019, -0.0341], "den_fs": [-0.0088, 0.0777, 0.062, -0.0652, 0.1039, -0.0891, 0.0904, -0.0562], "nosso_fr": [15500.0, 17800.0, 18800.0, 16900.0, 15900.0, 16500.0, 16000.0, 16500.0, 18300.0], "nosso_fs": [306000.0, 307000.0, 324000.0, 304000.0, 295000.0, 313000.0, 313000.0, 336000.0, 328000.0], "conc_fr": [36831.0, 37705.0, 37046.0, 34572.0, 36252.0, 36012.0, 35901.0, 37236.0, 36976.0], "conc_fs": [258134.0, 260054.0, 243997.0, 233112.0, 245390.0, 225877.0, 241401.0, 225675.0, 234535.0]}, "Goiania": {"rms_fr": [0.217, 0.209, 0.2, 0.195, 0.195, 0.191, 0.194, 0.185, 0.207], "rms_fs": [0.514, 0.469, 0.488, 0.466, 0.394, 0.425, 0.417, 0.379, 0.409], "num_fr": [0.0095, -0.02, -0.0103, 0.0, 0.0096, 0.0093, 0.0, 0.0259], "den_fr": [-0.0171, 0.011, 0.0054, -0.0007, -0.0127, -0.0063, -0.009, -0.0043], "num_fs": [-0.02, -0.0217, -0.0217, -0.0767, 0.0223, 0.0, -0.021, 0.0215], "den_fs": [-0.0245, 0.04, 0.0001, 0.0048, 0.0081, -0.0077, -0.017, 0.0084], "nosso_fr": [2100.0, 2200.0, 2000.0, 1900.0, 1900.0, 2000.0, 2100.0, 2100.0, 2400.0], "nosso_fs": [49000.0, 47000.0, 45000.0, 43000.0, 36000.0, 38000.0, 38000.0, 36000.0, 38000.0], "conc_fr": [9687.0, 10514.0, 9987.0, 9727.0, 9763.0, 10445.0, 10801.0, 11327.0, 11599.0], "conc_fs": [95359.0, 100129.0, 92270.0, 92251.0, 91318.0, 89489.0, 91151.0, 95031.0, 92979.0]}}};
+
+let currentPraça = 'Total';
+let currentProd = 'fr';
+let chartRms, chartDecomp;
+
+function fmtPP(v){ return v===null||v===undefined ? '—' : (v>=0?'+':'')+v.toFixed(3); }
+function fmtNum0(v){ return v===null||v===undefined ? '—' : fmt(v); }
+
+function initPraçaPicker(){
+  const picker = document.getElementById('praçaPicker');
+  picker.innerHTML = rmsRaw.praças.map(p=>`<button data-p="${p}" class="${p==='Total'?'active':''}">${p}</button>`).join('');
+  picker.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      picker.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      currentPraça = btn.dataset.p;
+      renderPraça();
+    });
+  });
+}
+
+function initFrFsToggle(){
+  const toggle = document.getElementById('frFsToggle');
+  toggle.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      toggle.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      currentProd = btn.dataset.prod;
+      renderDecomp();
+    });
+  });
+}
+
+function renderPraça(){
+  const d = rmsRaw.data[currentPraça];
+  document.getElementById('rmsTitle').textContent = `RMS mensal — ${currentPraça}`;
+  document.getElementById('decompTitle').textContent = currentPraça;
+  document.getElementById('tableTitle1').textContent = currentPraça;
+  document.getElementById('tableTitle2').textContent = currentPraça;
+
+  if(chartRms) chartRms.destroy();
+  chartRms = new Chart(document.getElementById('chartRmsPorPraça'), {
+    type:'line',
+    data:{
+      labels: rmsRaw.labels,
+      datasets:[
+        {label:'RMS FR', data:d.rms_fr, borderColor:'#1B3A93', backgroundColor:'#1B3A9322', fill:true, tension:.3, pointRadius:3},
+        {label:'RMS FS', data:d.rms_fs, borderColor:'#C1572E', backgroundColor:'#C1572E15', fill:true, tension:.3, pointRadius:3}
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{backgroundColor:'#1E1B16', padding:10}},
+      scales:{ x:{grid:{display:false}}, y:{grid:{color:'#EFEBE2'}} }
+    }
+  });
+
+  // tabela supply
+  const t1 = document.getElementById('tableSupply');
+  t1.querySelector('thead').innerHTML = `<tr><th>Mês</th><th class="num">Nosso FR</th><th class="num">Conc. FR</th><th class="num">Nosso FS</th><th class="num">Conc. FS</th></tr>`;
+  t1.querySelector('tbody').innerHTML = rmsRaw.labels.map((l,i)=>`
+    <tr><td>${l}</td><td class="num">${fmtNum0(d.nosso_fr[i])}</td><td class="num">${fmtNum0(d.conc_fr[i])}</td>
+    <td class="num">${fmtNum0(d.nosso_fs[i])}</td><td class="num">${fmtNum0(d.conc_fs[i])}</td></tr>`).join('');
+
+  renderDecomp();
+}
+
+function renderDecomp(){
+  const d = rmsRaw.data[currentPraça];
+  const legend = document.getElementById('decompLegend');
+
+  if(chartDecomp) chartDecomp.destroy();
+
+  if(currentProd === 'both'){
+    legend.innerHTML = `
+      <span><span class="dot" style="background:#1B3A93"></span>FR · Numerador</span>
+      <span><span class="dot" style="background:#7C93D6"></span>FR · Denominador</span>
+      <span><span class="dot" style="background:#C1572E"></span>FS · Numerador</span>
+      <span><span class="dot" style="background:#E0A480"></span>FS · Denominador</span>`;
+
+    chartDecomp = new Chart(document.getElementById('chartDecompPraça'), {
+      type:'bar',
+      data:{
+        labels: rmsRaw.labelsDelta,
+        datasets:[
+          {label:'FR · Numerador',   data:d.num_fr, backgroundColor:'#1B3A93', stack:'fr', borderRadius:2},
+          {label:'FR · Denominador', data:d.den_fr, backgroundColor:'#7C93D6', stack:'fr', borderRadius:2},
+          {label:'FS · Numerador',   data:d.num_fs, backgroundColor:'#C1572E', stack:'fs', borderRadius:2},
+          {label:'FS · Denominador', data:d.den_fs, backgroundColor:'#E0A480', stack:'fs', borderRadius:2}
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false},
+          tooltip:{backgroundColor:'#1E1B16', padding:10, callbacks:{label:(c)=>`${c.dataset.label}: ${fmtPP(c.parsed.y)} RMS`}}},
+        scales:{ x:{grid:{display:false}}, y:{grid:{color:'#EFEBE2'}, ticks:{callback:(v)=>v.toFixed(2)}} }
+      }
+    });
+
+    const t2 = document.getElementById('tableDecomp');
+    t2.querySelector('thead').innerHTML = `<tr><th>Mês</th><th class="num">Num. FR</th><th class="num">Den. FR</th><th class="num">Num. FS</th><th class="num">Den. FS</th></tr>`;
+    t2.querySelector('tbody').innerHTML = rmsRaw.labelsDelta.map((l,i)=>`
+      <tr><td>${l}</td><td class="num">${fmtPP(d.num_fr[i])}</td><td class="num">${fmtPP(d.den_fr[i])}</td>
+      <td class="num">${fmtPP(d.num_fs[i])}</td><td class="num">${fmtPP(d.den_fs[i])}</td></tr>`).join('');
+    return;
+  }
+
+  legend.innerHTML = `
+    <span><span class="dot" style="background:#1B3A93"></span>Efeito numerador (nosso supply)</span>
+    <span><span class="dot" style="background:#C98A6B"></span>Efeito denominador (concorrente)</span>`;
+
+  const num = currentProd==='fr' ? d.num_fr : d.num_fs;
+  const den = currentProd==='fr' ? d.den_fr : d.den_fs;
+
+  chartDecomp = new Chart(document.getElementById('chartDecompPraça'), {
+    type:'bar',
+    data:{
+      labels: rmsRaw.labelsDelta,
+      datasets:[
+        {label:'Efeito numerador', data:num, backgroundColor:'#1B3A93', stack:'s', borderRadius:2},
+        {label:'Efeito denominador', data:den, backgroundColor:'#C98A6B', stack:'s', borderRadius:2}
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false},
+        tooltip:{backgroundColor:'#1E1B16', padding:10, callbacks:{label:(c)=>`${c.dataset.label}: ${fmtPP(c.parsed.y)} RMS`}}},
+      scales:{ x:{grid:{display:false}, stacked:true}, y:{stacked:true, grid:{color:'#EFEBE2'}, ticks:{callback:(v)=>v.toFixed(2)}} }
+    }
+  });
+
+  const t2 = document.getElementById('tableDecomp');
+  t2.querySelector('thead').innerHTML = `<tr><th>Mês</th><th class="num">Num. ${currentProd.toUpperCase()}</th><th class="num">Den. ${currentProd.toUpperCase()}</th><th class="num">Δ RMS total</th></tr>`;
+  t2.querySelector('tbody').innerHTML = rmsRaw.labelsDelta.map((l,i)=>{
+    const total = (num[i]!==null && den[i]!==null) ? num[i]+den[i] : null;
+    return `<tr><td>${l}</td><td class="num">${fmtPP(num[i])}</td><td class="num">${fmtPP(den[i])}</td>
+    <td class="num" style="font-weight:600;">${fmtPP(total)}</td></tr>`;
+  }).join('');
+}
+
+initPraçaPicker();
+initFrFsToggle();
+renderPraça();
+
+// ============ 08 PORTAIS (Normandia) ============
+const portaisData = [
+  {nome:'BUSKAZA', contas:1, fr:12620, fs:321119, grupo:'original'},
+  {nome:'Inova (grupo)', contas:7, fr:4180, fs:52512, grupo:'original'},
+  {nome:'DreamCasa', contas:0, fr:0, fs:0, grupo:'original'},
+  {nome:'Rankim', contas:0, fr:0, fs:0, grupo:'original'},
+  {nome:'L4S', contas:0, fr:0, fs:0, grupo:'original'},
+  {nome:'Leads4Sales', contas:0, fr:0, fs:0, grupo:'original'},
+  {nome:'Lopes (rede)', contas:55, fr:13621, fs:245198, grupo:'novo'},
+  {nome:'Revenda Imóveis', contas:8, fr:3509, fs:217278, grupo:'novo'},
+  {nome:'Paulo Roberto Leardi', contas:2, fr:12607, fs:72880, grupo:'novo'},
+  {nome:'Newcore', contas:2, fr:0, fs:78593, grupo:'novo'},
+  {nome:'Auxiliadora Franquias', contas:1, fr:5457, fs:70518, grupo:'novo'},
+  {nome:'Foxter', contas:1, fr:0, fs:50487, grupo:'novo'},
+  {nome:'Imoveis Credito Real', contas:1, fr:4721, fs:51540, grupo:'novo'},
+  {nome:'Sua Quadra', contas:1, fr:7990, fs:0, grupo:'novo'},
+  {nome:'R2 Flats', contas:2, fr:6875, fs:3837, grupo:'novo'},
+  {nome:'Superlogica', contas:1, fr:3500, fs:32097, grupo:'novo'},
+  {nome:'Rarus Flats', contas:1, fr:4694, fs:4010, grupo:'novo'},
+  {nome:'Só Flats Residences', contas:1, fr:2287, fs:6222, grupo:'novo'},
+].filter(p=>p.fr>0||p.fs>0).sort((a,b)=>(b.fr+b.fs)-(a.fr+a.fs));
+
+const totalFRCarteira = 299097;
+const totalFSCarteira = 3428322;
+
+new Chart(document.getElementById('chartPortais'), {
+  type:'bar',
+  data:{
+    labels: portaisData.map(p=>p.nome),
+    datasets:[
+      {label:'% estoque FR', data: portaisData.map(p=>(p.fr/totalFRCarteira*100).toFixed(2)), backgroundColor:'#1B3A93', borderRadius:3},
+      {label:'% estoque FS', data: portaisData.map(p=>(p.fs/totalFSCarteira*100).toFixed(2)), backgroundColor:'#7A4E6D', borderRadius:3}
+    ]
+  },
+  options:{
+    indexAxis:'y',
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}, tooltip:{backgroundColor:'#1E1B16', padding:10, callbacks:{label:(c)=>`${c.dataset.label}: ${c.parsed.x}%`}}},
+    scales:{ x:{grid:{color:'#EFEBE2'}, ticks:{callback:(v)=>v+'%'}}, y:{grid:{display:false}} }
+  }
+});
+
+const tablePortais = document.getElementById('tablePortais');
+tablePortais.querySelector('thead').innerHTML = `<tr><th>Operador</th><th>Grupo</th><th class="num">Contas</th><th class="num">Listings FR</th><th class="num">% FR</th><th class="num">Listings FS</th><th class="num">% FS</th></tr>`;
+tablePortais.querySelector('tbody').innerHTML = portaisData.map(p=>`
+  <tr><td>${p.nome}</td><td><span class="tag ${p.grupo==='original'?'fr':'fs'}">${p.grupo==='original'?'original':'novo'}</span></td><td class="num">${p.contas}</td>
+  <td class="num">${fmt(p.fr)}</td><td class="num">${(p.fr/totalFRCarteira*100).toFixed(2)}%</td>
+  <td class="num">${fmt(p.fs)}</td><td class="num">${(p.fs/totalFSCarteira*100).toFixed(2)}%</td></tr>`).join('') +
+  `<tr style="font-weight:600;background:var(--paper-2);"><td colspan="2">Total (18 operadores)</td><td class="num">${portaisData.reduce((a,p)=>a+p.contas,0)}</td>
+  <td class="num">${fmt(portaisData.reduce((a,p)=>a+p.fr,0))}</td><td class="num">${(portaisData.reduce((a,p)=>a+p.fr,0)/totalFRCarteira*100).toFixed(2)}%</td>
+  <td class="num">${fmt(portaisData.reduce((a,p)=>a+p.fs,0))}</td><td class="num">${(portaisData.reduce((a,p)=>a+p.fs,0)/totalFSCarteira*100).toFixed(2)}%</td></tr>`;
+
+// ============ 09 INICIATIVA ============
+const motivosData = [
+  {motivo:'Nunca respondeu', contas:38, opp:7805},
+  {motivo:'Não tem interesse', contas:14, opp:3715},
+  {motivo:'Outro', contas:7, opp:1215},
+  {motivo:'Exclusividade em outro portal', contas:3, opp:1123},
+  {motivo:'Parou de responder', contas:11, opp:963},
+  {motivo:'São listings duplicados', contas:3, opp:864},
+  {motivo:'Sem acesso ao decisor', contas:3, opp:715},
+  {motivo:'Não quer relacionamento com QuintoAndar', contas:4, opp:264},
+  {motivo:'Não vale o custo benefício', contas:1, opp:233},
+  {motivo:'Momento de compra', contas:2, opp:176},
+].sort((a,b)=>b.opp-a.opp);
+
+new Chart(document.getElementById('chartMotivos'), {
+  type:'bar',
+  data:{
+    labels: motivosData.map(m=>m.motivo),
+    datasets:[{label:'Opp. perdida', data: motivosData.map(m=>m.opp), backgroundColor:'#B4552F', borderRadius:3}]
+  },
+  options:{
+    indexAxis:'y',
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}, tooltip:{backgroundColor:'#1E1B16', padding:10, callbacks:{label:(c)=>`${fmt(c.parsed.x)} listings`}}},
+    scales:{ x:{grid:{color:'#EFEBE2'}, ticks:{callback:(v)=>fmt(v)}}, y:{grid:{display:false}} }
+  }
+});
+
+const tableMotivosFull = document.getElementById('tableMotivosFull');
+tableMotivosFull.querySelector('thead').innerHTML = `<tr><th>Motivo</th><th class="num">Contas</th><th class="num">Opp. perdida</th><th class="num">% do total</th></tr>`;
+const totalOppPerdida = motivosData.reduce((a,m)=>a+m.opp,0);
+tableMotivosFull.querySelector('tbody').innerHTML = motivosData.map(m=>`
+  <tr><td>${m.motivo}</td><td class="num">${m.contas}</td><td class="num">${fmt(m.opp)}</td><td class="num">${(m.opp/totalOppPerdida*100).toFixed(1)}%</td></tr>`).join('');
+
+const negociacaoData = [
+  ['ARCOVERDE IMOBILIARIA','Nice Santos',971,'18/06 boot, proposta enviada'],
+  ['samuel carvalho imoveis','Nice Santos',491,'whatsapp, em negociação'],
+  ['gki comercializacao de bens imoveis','Nice Santos',480,'negociando com proposta, follow 11/06 sem resposta'],
+  ['special imoveis tatuape','Nice Santos',372,'pediu contato via whatsapp, com proposta'],
+  ['so galpoes','Nice Santos',303,'negociando por whatsapp, pediu enviar por email'],
+  ['adbens negocios imobiliarios','Nice Santos',255,'boot 06/07'],
+  ['praticis imoveis','Nice Santos',255,'proposta enviada via whatsapp'],
+  ['orsaneder xavier negocios','Nice Santos',237,'26/06 boot, proposta enviada'],
+  ['tiete imoveis','Nice Santos',235,'ligação, pediu proposta por whatsapp e email'],
+  ['espaco de imoveis','Tiago Goncalves',171,'Pack 350 — 30 Super Destaque + 60 Destaque'],
+];
+const tableNeg = document.getElementById('tableNegociacao');
+tableNeg.querySelector('thead').innerHTML = `<tr><th>Cliente</th><th>Hunter</th><th class="num">Opp.</th></tr>`;
+tableNeg.querySelector('tbody').innerHTML = negociacaoData.map(r=>`
+  <tr><td title="${r[3]}">${r[0]}</td><td><span class="tag fr">${r[1].split(' ')[0]}</span></td><td class="num">${fmt(r[2])}</td></tr>`).join('');
+
+const ganhosData = [
+  ['HAI IMOVEIS LTDA','Nice Santos',695],
+  ['kovab construções reformas','Tiago Goncalves',482],
+  ['freire imoveis consultoria','Nice Santos',391],
+  ['etic imoveis','Nice Santos',313],
+  ['vgv assessoria em administração','Nice Santos',302],
+  ['santos e mello imoveis','Nice Santos',285],
+  ['zequinha imoveis e adm','Nice Santos',281],
+  ['furtado imoveis','Nice Santos',232],
+  ['xpro imoveis','Tiago Goncalves',216],
+  ['wb alpha imoveis','Nice Santos',198],
+];
+const tableGan = document.getElementById('tableGanhos');
+tableGan.querySelector('thead').innerHTML = `<tr><th>Cliente</th><th>Hunter</th><th class="num">Opp.</th></tr>`;
+tableGan.querySelector('tbody').innerHTML = ganhosData.map(r=>`
+  <tr><td>${r[0]}</td><td><span class="tag fr">${r[1].split(' ')[0]}</span></td><td class="num">${fmt(r[2])}</td></tr>`).join('');
+
+// ============ TOP 100 OPORTUNIDADES ============
+const top100Data = [
+  ['ARCOVERDE IMOBILIARIA','Nice Santos','Em negociação',971],
+  ['federall realty consultoria','Nice Santos','Concluído - Perdida',943],
+  ['SPRE SAO PAULO REAL ESTATE','Nice Santos','Mensagem botmaker',899],
+  ['power flats','Nice Santos','Tentativa de contato',887],
+  ['anil imoveis sao paulo','Nice Santos','Em contato',869],
+  ['areas e galpoes consultoria imobiliaria','Tiago Goncalves','Mensagem botmaker',834],
+  ['IMOVEIS PRO PROSPERIDADE','Tiago Goncalves','Sem abordagem',817],
+  ['poa imob','Tiago Goncalves','Concluído - Perdida',788],
+  ['cervoni imoveis','Nice Santos','Tentativa de contato',783],
+  ['inl novolar','Nice Santos','Tentativa de contato',773],
+  ['PACHECO IMÓVEIS','Tiago Goncalves','Concluído - Perdida',768],
+  ['bridge consultoria de imoveis','Nice Santos','Concluído - Perdida',763],
+  ['alianca assessoria e adm. condomínios','Tiago Goncalves','Concluído - Perdida',759],
+  ['imobiliaria pinotti ltda epp','Nice Santos','Tentativa de contato',744],
+  ['silveira vendas e locacoes','Tiago Goncalves','Concluído - Perdida',714],
+  ['HAI IMOVEIS LTDA','Nice Santos','Concluído - Ganhada',695],
+  ['brasil flats empreendimentos','Nice Santos','Tentativa de contato',657],
+  ['epaminondas de jesus coelho','Tiago Goncalves','Concluído - Perdida',630],
+  ['marcia a sousa','Nice Santos','Tentativa de contato',615],
+  ['site location imoveis','Tiago Goncalves','Concluído - Perdida',601],
+  ['Imperium Web','Tiago Goncalves','Mensagem botmaker',588],
+  ['mc cavalheire','Tiago Goncalves','Mensagem botmaker',577],
+  ['thera imoveis','Nice Santos','Tentativa de contato',535],
+  ['af negocios imobiliarios ltda','Tiago Goncalves','Concluído - Perdida',522],
+  ['samuel carvalho imoveis','Nice Santos','Em negociação',491],
+  ['kovab construções reformas','Tiago Goncalves','Concluído - Ganhada',482],
+  ['gki comercializacao de bens','Nice Santos','Em negociação',480],
+  ['baru imoveis','Nice Santos','Tentativa de contato',473],
+  ['cilar imoveis','Nice Santos','Tentativa de contato',462],
+  ['casa 192','Tiago Goncalves','Mensagem botmaker',462],
+];
+
+const top100Status = [
+  {status:'Tentativa de contato', contas:37, opp:14864},
+  {status:'Concluído - Perdida', contas:23, opp:10718},
+  {status:'Mensagem botmaker', contas:20, opp:8016},
+  {status:'Em negociação', contas:9, opp:3599},
+  {status:'Concluído - Ganhada', contas:8, opp:2981},
+  {status:'Sem abordagem', contas:2, opp:1098},
+  {status:'Em contato', contas:1, opp:869},
+];
+const coresStatus = {
+  'Tentativa de contato':'#C9C2B4', 'Concluído - Perdida':'#B4552F', 'Mensagem botmaker':'#DAD3C4',
+  'Em negociação':'#C98A6B', 'Concluído - Ganhada':'#1B3A93', 'Sem abordagem':'#E8B48C', 'Em contato':'#7A4E6D'
+};
+
+new Chart(document.getElementById('chartTop100'), {
+  type:'doughnut',
+  data:{
+    labels: top100Status.map(s=>s.status),
+    datasets:[{data: top100Status.map(s=>s.opp), backgroundColor: top100Status.map(s=>coresStatus[s.status]), borderWidth:2, borderColor:'#FFFEFB'}]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{position:'right', labels:{boxWidth:12, font:{size:11}}},
+      tooltip:{backgroundColor:'#1E1B16', padding:10, callbacks:{label:(c)=>`${c.label}: ${fmt(c.parsed)} listings`}}
+    }
+  }
+});
+
+const tableTop100 = document.getElementById('tableTop100');
+tableTop100.querySelector('thead').innerHTML = `<tr><th>Cliente</th><th>Hunter</th><th>Status</th><th class="num">Opp.</th></tr>`;
+const statusTagClass = (s) => s==='Concluído - Ganhada' ? 'fr' : (s==='Concluído - Perdida' ? 'fs' : '');
+tableTop100.querySelector('tbody').innerHTML = top100Data.map(r=>`
+  <tr><td>${r[0]}</td><td><span class="tag fr">${r[1].split(' ')[0]}</span></td>
+  <td>${r[2]}</td><td class="num">${fmt(r[3])}</td></tr>`).join('');
+
+// Origem venda nova FR "fora da iniciativa" — cruzamento idsap x Carteira de Encerramento jul/26
+const origemFinalData = [
+  {time:'Jumbo', delta:3547},
+  {time:'Hunter (papel amplo)', delta:2763},
+  {time:'Middle', delta:660},
+  {time:'ID não encontrado', delta:511},
+  {time:'Relacionamento', delta:273},
+  {time:'Regional DF', delta:158},
+  {time:'C2C', delta:120},
+].sort((a,b)=>b.delta-a.delta);
+
+new Chart(document.getElementById('chartOrigemFinal'), {
+  type:'bar',
+  data:{
+    labels: origemFinalData.map(t=>t.time),
+    datasets:[{label:'Delta FR', data: origemFinalData.map(t=>t.delta),
+      backgroundColor: origemFinalData.map(t=>t.time==='Hunter (papel amplo)' ? '#C1572E' : '#1B3A93'), borderRadius:3}]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}, tooltip:{backgroundColor:'#1E1B16', padding:10, callbacks:{label:(c)=>`${fmt(c.parsed.y)} listings`}}},
+    scales:{ x:{grid:{display:false}}, y:{grid:{color:'#EFEBE2'}, ticks:{callback:(v)=>fmt(v)}} }
+  }
+});
+
+const totalOrigemFinal = origemFinalData.reduce((a,t)=>a+t.delta,0);
+const tableOrigemFinal = document.getElementById('tableOrigemFinal');
+tableOrigemFinal.querySelector('thead').innerHTML = `<tr><th>Time</th><th class="num">Delta FR</th><th class="num">% do total</th></tr>`;
+tableOrigemFinal.querySelector('tbody').innerHTML = origemFinalData.map(t=>`
+  <tr><td>${t.time}</td><td class="num">${fmt(t.delta)}</td><td class="num">${(t.delta/totalOrigemFinal*100).toFixed(1)}%</td></tr>`).join('') +
+  `<tr style="font-weight:600;background:var(--paper-2);"><td>Total</td><td class="num">${fmt(totalOrigemFinal)}</td><td class="num">100,0%</td></tr>`;
+</script>
+</body>
+</html>
